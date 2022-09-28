@@ -1,0 +1,38 @@
+[package]
+name = "archivebot"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "archivebot"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4.0", features = ["serde"] }
+lazy_static = "1.4.0"
+clap = { version = "3.2.8", features = ["derive"] }
+env_logger = "0.8.4"
+log = "0.4"
+mime_guess = "2"
+url = "2.2.2"
+uuid = { version = "1.1.2", features = ["v4", "serde"] }
+derivative = "2.2.0"
+validator = { version = "0.16", features = ["derive"] }
+actix-web-validator = "5"
+rand = "0.8.5"
+reqwest = { version = "0.11", default-features = false, features = [
+  "json", "cookies", "rustls-tls-webpki-roots"] }
+
+[dev-dependencies]
+mockito = "0.31.0"
+
+[profile.release]
+lto = true
+strip = true
