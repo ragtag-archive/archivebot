@@ -1,7 +1,7 @@
-use futures_util::stream::StreamExt;
+use super::{VideoDownloadResult, VideoDownloader};
+use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
-use tempfile::TempDir;
+use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
@@ -14,9 +14,50 @@ pub struct YTDL {
     ffmpeg_path: PathBuf,
 }
 
-pub struct DownloadResult {
-    pub output: std::process::Output,
-    pub workdir: TempDir,
+#[async_trait]
+impl VideoDownloader for YTDL {
+    /// Download a video from YouTube.
+    async fn download(&self, url: &str, destination: &Path) -> anyhow::Result<VideoDownloadResult> {
+        info!("Downloading {}", url);
+
+        // Download the video
+        let mut cmd = Command::new(&self.ytdlp_path);
+        let cmd = cmd
+            .current_dir(destination)
+            .args(&[
+                "-f",
+                "bestvideo[protocol*=https]+bestaudio",
+                "--ffmpeg-location",
+                &self.ffmpeg_path.to_string_lossy(),
+                // Subtitles
+                "--write-subs",
+                "--sub-format",
+                "srv3/best",
+                "--sub-langs",
+                "all,-live_chat",
+                // Metadata
+                "--write-thumbnail",
+                "--write-comments",
+                "--write-thumbnail",
+                // Embed
+                "--embed-subs",
+                "--embed-metadata",
+                "--embed-info-json",
+                "--embed-chapters",
+                // Output
+                "--merge-output-format",
+                "webm/mp4/mkv",
+                "--output",
+                "%(id)s.%(ext)s",
+            ])
+            .arg(url);
+
+        debug!("Running command: {:?}", cmd);
+        let output = cmd.output().await?;
+
+        info!("yt-dlp finished {}", url);
+        Ok(VideoDownloadResult { output })
+    }
 }
 
 impl YTDL {
@@ -90,52 +131,6 @@ impl YTDL {
 
         Ok(())
     }
-
-    /// Download a video from YouTube.
-    pub async fn download(&self, url: &str) -> anyhow::Result<DownloadResult> {
-        info!("Downloading {}", url);
-
-        // Create a temporary directory to store the video in
-        let workdir = tempfile::tempdir()?;
-
-        // Download the video
-        let mut cmd = Command::new(&self.ytdlp_path);
-        let cmd = cmd
-            .current_dir(&workdir)
-            .args(&[
-                "-f",
-                "bestvideo[protocol*=https]+bestaudio",
-                "--ffmpeg-location",
-                &self.ffmpeg_path.to_string_lossy(),
-                // Subtitles
-                "--write-subs",
-                "--sub-format",
-                "srv3/best",
-                "--sub-langs",
-                "all,-live_chat",
-                // Metadata
-                "--write-thumbnail",
-                "--write-comments",
-                "--write-thumbnail",
-                // Embed
-                "--embed-subs",
-                "--embed-metadata",
-                "--embed-info-json",
-                "--embed-chapters",
-                // Output
-                "--merge-output-format",
-                "webm/mp4/mkv",
-                "--output",
-                "%(id)s.%(ext)s",
-            ])
-            .arg(url);
-
-        debug!("Running command: {:?}", cmd);
-        let output = cmd.output().await?;
-
-        info!("yt-dlp finished {}", url);
-        Ok(DownloadResult { output, workdir })
-    }
 }
 
 #[cfg(test)]
@@ -143,12 +138,17 @@ mod test {
     use super::*;
 
     #[tokio::test]
+    #[ignore] // Takes >150s to run
     async fn test_download() {
         let ytdl = YTDL::new().await;
         assert!(ytdl.is_installed().await);
 
+        let workdir = tempfile::tempdir().expect("Could not create temp dir");
         let result = ytdl
-            .download("https://www.youtube.com/watch?v=stmZAThUl64")
+            .download(
+                "https://www.youtube.com/watch?v=stmZAThUl64",
+                workdir.path(),
+            )
             .await
             .expect("Could not download video");
 
@@ -157,10 +157,10 @@ mod test {
             "yt-dlp did not exit successfully: {}",
             String::from_utf8_lossy(&result.output.stderr)
         );
-        assert!(result.workdir.path().exists(), "Workdir does not exist");
+        assert!(workdir.path().exists(), "Workdir does not exist");
 
         // Check the list of files in the workdir
-        let mut files = tokio::fs::read_dir(result.workdir.path())
+        let mut files = tokio::fs::read_dir(workdir.path())
             .await
             .expect("Could not read workdir");
 

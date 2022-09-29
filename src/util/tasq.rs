@@ -1,3 +1,5 @@
+use super::{TaskConsumeResponse, TaskInsertResponse, TaskListResponse, TaskQueue};
+use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -14,60 +16,61 @@ pub struct TasqResponse<T> {
     message: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct PutResponse {
-    key: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListResponse {
-    tasks: Vec<String>,
-    count: usize,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ConsumeResponse {
-    key: String,
-    data: String,
-}
-
 impl Tasq {
     /// Create a new Tasq client. The URL should already include the list ID.
-    pub fn new(url: String, client: Option<Client>) -> Self {
+    fn new(url: String, client: Option<Client>) -> Self {
         debug!("Creating Tasq client with URL {}", url);
         let client = client.unwrap_or_else(|| Client::new());
         Tasq { url, client }
     }
+}
 
+#[async_trait]
+impl TaskQueue for Tasq {
     /// Insert a new item into the queue. If the item is already in the queue,
     /// its priority will be bumped up by one.
-    pub async fn insert(&self, data: String) -> anyhow::Result<PutResponse> {
+    async fn insert(&self, data: String) -> anyhow::Result<TaskInsertResponse> {
         debug!("Inserting {} into Tasq", data);
         let res = self.client.put(&self.url).body(data).send().await?;
-        let res = res.json::<TasqResponse<PutResponse>>().await?;
+        let res = res.json::<TasqResponse<TaskInsertResponse>>().await?;
         debug!("Got response {:?}", res);
-        Ok(res.payload)
+
+        if res.ok {
+            Ok(res.payload)
+        } else {
+            Err(anyhow::anyhow!("Tasq error: {}", res.message))
+        }
     }
 
     /// List the first 100 task keys and total count in the specified list,
     /// ordered by priority from highest to lowest.
-    pub async fn list(&self) -> anyhow::Result<ListResponse> {
+    async fn list(&self) -> anyhow::Result<TaskListResponse> {
         debug!("Listing tasks");
         let res = self.client.get(&self.url).send().await?;
-        let res = res.json::<TasqResponse<ListResponse>>().await?;
+        let res = res.json::<TasqResponse<TaskListResponse>>().await?;
         debug!("Got response {:?}", res);
-        Ok(res.payload)
+
+        if res.ok {
+            Ok(res.payload)
+        } else {
+            Err(anyhow::anyhow!("Tasq error: {}", res.message))
+        }
     }
 
     /// Consume an item from the queue. Once consumed, the item will be removed
     /// from the list. The item with the highest priority will be consumed first.
     /// If the queue is empty, this will return an error.
-    pub async fn consume(&self) -> anyhow::Result<ConsumeResponse> {
+    async fn consume(&self) -> anyhow::Result<TaskConsumeResponse> {
         debug!("Consuming task");
         let res = self.client.post(&self.url).send().await?;
-        let res = res.json::<TasqResponse<ConsumeResponse>>().await?;
+        let res = res.json::<TasqResponse<TaskConsumeResponse>>().await?;
         debug!("Got response {:?}", res);
-        Ok(res.payload)
+
+        if res.ok {
+            Ok(res.payload)
+        } else {
+            Err(anyhow::anyhow!(res.message))
+        }
     }
 }
 
