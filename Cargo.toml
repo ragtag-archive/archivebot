@@ -12,12 +12,16 @@ name = "archivebot"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures-util = "0.3"
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4.0", features = ["serde"] }
 lazy_static = "1.4.0"
 clap = { version = "3.2.8", features = ["derive"] }
+dirs = "4.0.0"
+tempfile = "3"
 env_logger = "0.8.4"
 log = "0.4"
 mime_guess = "2"
@@ -28,7 +32,7 @@ validator = { version = "0.16", features = ["derive"] }
 actix-web-validator = "5"
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, features = [
-  "json", "cookies", "rustls-tls-webpki-roots"] }
+  "json", "cookies", "rustls-tls-webpki-roots", "stream"] }
 
 [dev-dependencies]
 mockito = "0.31.0"
