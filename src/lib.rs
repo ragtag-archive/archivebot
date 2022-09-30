@@ -2,7 +2,8 @@
 #[macro_use]
 extern crate log;
 
-mod util;
+pub mod archiver;
+pub mod util;
 
 pub static APP_NAME: &str = env!("CARGO_PKG_NAME");
 
@@ -16,9 +17,18 @@ pub async fn run() -> anyhow::Result<()> {
         util::rclone::Rclone::new("".into(), "".into()),
     );
 
-    tasq?;
-    ytdlp?;
-    rclone?;
+    let tasq = Box::new(tasq.map_err(|e| anyhow::anyhow!("Could not create Tasq client: {}", e))?);
+    let ytdlp =
+        Box::new(ytdlp.map_err(|e| anyhow::anyhow!("Could not create YTDL client: {}", e))?);
+    let rclone =
+        Box::new(rclone.map_err(|e| anyhow::anyhow!("Could not create Rclone client: {}", e))?);
+
+    let bot = archiver::ArchiveBot::new(tasq, ytdlp, rclone);
+
+    info!("{} running", APP_NAME);
+    bot.run_one()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failure during archival: {}", e))?;
 
     info!("Bye!");
     Ok(())

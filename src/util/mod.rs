@@ -8,19 +8,19 @@ pub mod ytdl;
 
 #[derive(Debug, Deserialize)]
 pub struct TaskInsertResponse {
-    key: String,
+    pub key: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TaskListResponse {
-    tasks: Vec<String>,
-    count: usize,
+    pub tasks: Vec<String>,
+    pub count: usize,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TaskConsumeResponse {
-    key: String,
-    data: String,
+    pub key: String,
+    pub data: String,
 }
 
 #[async_trait]
@@ -42,4 +42,10 @@ pub trait VideoDownloader {
 #[async_trait]
 pub trait Uploader {
     async fn upload(&self, source_dir: &Path, target_dir: &str) -> anyhow::Result<()>;
+}
+
+#[async_trait]
+pub trait SelfInstallable {
+    async fn is_installed(&self) -> bool;
+    async fn install(&self) -> anyhow::Result<()>;
 }

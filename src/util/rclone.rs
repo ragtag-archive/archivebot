@@ -1,4 +1,4 @@
-use super::Uploader;
+use super::{SelfInstallable, Uploader};
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -41,9 +41,12 @@ impl Rclone {
 
         Ok(rclone)
     }
+}
 
+#[async_trait]
+impl SelfInstallable for Rclone {
     /// Check if rclone is installed
-    pub async fn is_installed(&self) -> bool {
+    async fn is_installed(&self) -> bool {
         Command::new(&self.rclone_path)
             .arg("--version")
             .output()
@@ -52,7 +55,7 @@ impl Rclone {
     }
 
     /// Download and install rclone
-    pub async fn install(&self) -> anyhow::Result<()> {
+    async fn install(&self) -> anyhow::Result<()> {
         info!("Installing rclone");
 
         // Fetch the zip file

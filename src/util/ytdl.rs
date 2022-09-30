@@ -1,4 +1,4 @@
-use super::{VideoDownloadResult, VideoDownloader};
+use super::{SelfInstallable, VideoDownloadResult, VideoDownloader};
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -60,6 +60,38 @@ impl VideoDownloader for YTDL {
     }
 }
 
+#[async_trait]
+impl SelfInstallable for YTDL {
+    /// Check whether the executables exist and can be executed.
+    async fn is_installed(&self) -> bool {
+        Command::new(&self.ytdlp_path)
+            .arg("--version")
+            .output()
+            .await
+            .is_ok()
+            && Command::new(&self.ffmpeg_path)
+                .arg("-version")
+                .output()
+                .await
+                .is_ok()
+    }
+
+    /// Install the latest version of yt-dlp from GitHub.
+    async fn install(&self) -> anyhow::Result<()> {
+        info!("Installing yt-dlp and ffmpeg");
+
+        let (ytdlp, ffmpeg) = tokio::join!(
+            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
+            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
+        );
+
+        ytdlp?;
+        ffmpeg?;
+
+        Ok(())
+    }
+}
+
 impl YTDL {
     /// Create a new instance of yt-dlp. If the executable is not found, it will
     /// be downloaded.
@@ -90,20 +122,6 @@ impl YTDL {
         Ok(ytdl)
     }
 
-    /// Check whether the executables exist and can be executed.
-    pub async fn is_installed(&self) -> bool {
-        Command::new(&self.ytdlp_path)
-            .arg("--version")
-            .output()
-            .await
-            .is_ok()
-            && Command::new(&self.ffmpeg_path)
-                .arg("-version")
-                .output()
-                .await
-                .is_ok()
-    }
-
     async fn install_binary(url: &str, path: &PathBuf) -> anyhow::Result<()> {
         // Fetch the file
         let mut resp = reqwest::get(url).await?;
@@ -119,21 +137,6 @@ impl YTDL {
         let mut perms = file.metadata().await?.permissions();
         perms.set_mode(0o755);
         file.set_permissions(perms).await?;
-
-        Ok(())
-    }
-
-    /// Install the latest version of yt-dlp from GitHub.
-    pub async fn install(&self) -> anyhow::Result<()> {
-        info!("Installing yt-dlp and ffmpeg");
-
-        let (ytdlp, ffmpeg) = tokio::join!(
-            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
-            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
-        );
-
-        ytdlp?;
-        ffmpeg?;
 
         Ok(())
     }
