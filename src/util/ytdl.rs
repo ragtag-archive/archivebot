@@ -96,9 +96,7 @@ impl YTDL {
     /// Create a new instance of yt-dlp. If the executable is not found, it will
     /// be downloaded.
     pub async fn new() -> anyhow::Result<Self> {
-        let cache_dir = dirs::cache_dir()
-            .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
-            .join("archivebot");
+        let cache_dir = super::get_cache_dir().await?;
         let ytdlp_path = cache_dir.join("yt-dlp");
         let ffmpeg_path = cache_dir.join("ffmpeg");
 

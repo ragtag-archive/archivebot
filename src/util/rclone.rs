@@ -1,3 +1,5 @@
+use crate::util::github;
+
 use super::{SelfInstallable, Uploader};
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
@@ -20,13 +22,8 @@ impl Rclone {
             remote_name, base_directory
         );
 
-        let cache_dir = dirs::cache_dir()
-            .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
-            .join("archivebot");
-        let rclone_path = cache_dir.join("rclone");
-
         let rclone = Rclone {
-            rclone_path,
+            rclone_path: super::get_cache_dir().await?.join("rclone"),
             remote_name,
             base_directory,
         };
@@ -58,28 +55,52 @@ impl SelfInstallable for Rclone {
     async fn install(&self) -> anyhow::Result<()> {
         info!("Installing rclone");
 
+        // Create the destination file
+        let mut destfile = std::fs::File::create(&self.rclone_path)
+            .map_err(|e| anyhow::anyhow!("Failed to create destination file: {}", e))?;
+
+        // Get the latest release info from GitHub
+        let client = reqwest::Client::new();
+        let release = github::get_latest_release("rclone/rclone", Some(client.clone()))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get latest release info: {}", e))?;
+
+        // Get the download URL
+        let download_url = release
+            .assets
+            .into_iter()
+            .find(|asset| asset.name.ends_with("linux-amd64.zip"))
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Could not find download URL"))?
+            .browser_download_url;
+
         // Fetch the zip file
-        let mut resp = reqwest::get(RCLONE_RELEASE_URL)
+        let mut resp = client
+            .get(&download_url)
+            .send()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to fetch rclone release: {}", e))?;
         let zipfile = tempfile::tempfile()
             .map_err(|e| anyhow::anyhow!("Failed to create temp file: {}", e))?;
-        let mut zipfile_async = tokio::fs::File::from_std(zipfile.try_clone()?);
+        let mut zipfile_async = tokio::fs::File::from_std(
+            zipfile
+                .try_clone()
+                .map_err(|e| anyhow::anyhow!("Failed to clone temp file: {}", e))?,
+        );
 
         // Write the zip file to a temporary file
         while let Some(chunk) = resp
             .chunk()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read chunk: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to read zip chunk: {}", e))?
         {
             zipfile_async
                 .write_all(&chunk)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to write chunk: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to write zip chunk: {}", e))?;
         }
 
         // Extract the zip file
-        let mut destfile = std::fs::File::create(&self.rclone_path)?;
         tokio::task::spawn_blocking(move || {
             let mut archive = zip::ZipArchive::new(zipfile)
                 .map_err(|e| anyhow::anyhow!("Failed to open zip file: {}", e))?;
@@ -100,9 +121,14 @@ impl SelfInstallable for Rclone {
                 .map_err(|e| anyhow::anyhow!("Failed to copy rclone binary: {}", e))?;
 
             // Make the file executable
-            let mut perms = destfile.metadata()?.permissions();
+            let mut perms = destfile
+                .metadata()
+                .map_err(|e| anyhow::anyhow!("Failed to get file metadata: {}", e))?
+                .permissions();
             perms.set_mode(0o755);
-            destfile.set_permissions(perms)?;
+            destfile
+                .set_permissions(perms)
+                .map_err(|e| anyhow::anyhow!("Failed to set file permissions: {}", e))?;
 
             Ok::<_, anyhow::Error>(())
         })

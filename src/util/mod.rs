@@ -1,10 +1,19 @@
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+mod github;
 pub mod rclone;
 pub mod tasq;
 pub mod ytdl;
+
+async fn get_cache_dir() -> anyhow::Result<PathBuf> {
+    let cache_dir = dirs::cache_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
+        .join("archivebot");
+    tokio::fs::create_dir_all(&cache_dir).await?;
+    Ok(cache_dir)
+}
 
 #[derive(Debug, Deserialize)]
 pub struct TaskInsertResponse {
