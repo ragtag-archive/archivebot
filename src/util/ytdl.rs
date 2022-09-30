@@ -63,9 +63,9 @@ impl VideoDownloader for YTDL {
 impl YTDL {
     /// Create a new instance of yt-dlp. If the executable is not found, it will
     /// be downloaded.
-    pub async fn new() -> Self {
+    pub async fn new() -> anyhow::Result<Self> {
         let cache_dir = dirs::cache_dir()
-            .expect("Could not find cache dir")
+            .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
             .join("archivebot");
         let ytdlp_path = cache_dir.join("yt-dlp");
         let ffmpeg_path = cache_dir.join("ffmpeg");
@@ -73,7 +73,7 @@ impl YTDL {
         // Ensure the cache directory exists
         tokio::fs::create_dir_all(&cache_dir)
             .await
-            .expect("Could not create cache dir");
+            .map_err(|e| anyhow::anyhow!("Could not create cache directory: {}", e))?;
 
         let ytdl = Self {
             ytdlp_path,
@@ -82,10 +82,12 @@ impl YTDL {
 
         // Install if not already installed
         if !ytdl.is_installed().await {
-            ytdl.install().await.expect("Could not install yt-dlp");
+            ytdl.install()
+                .await
+                .map_err(|e| anyhow::anyhow!("Could not install yt-dlp and ffmpeg: {}", e))?;
         }
 
-        ytdl
+        Ok(ytdl)
     }
 
     /// Check whether the executables exist and can be executed.
@@ -123,11 +125,15 @@ impl YTDL {
 
     /// Install the latest version of yt-dlp from GitHub.
     pub async fn install(&self) -> anyhow::Result<()> {
-        info!("Installing yt-dlp");
-        Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path).await?;
+        info!("Installing yt-dlp and ffmpeg");
 
-        info!("Installing ffmpeg");
-        Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path).await?;
+        let (ytdlp, ffmpeg) = tokio::join!(
+            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
+            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
+        );
+
+        ytdlp?;
+        ffmpeg?;
 
         Ok(())
     }
@@ -140,7 +146,7 @@ mod test {
     #[tokio::test]
     #[ignore] // Takes >150s to run
     async fn test_download() {
-        let ytdl = YTDL::new().await;
+        let ytdl = YTDL::new().await.expect("Could not create yt-dlp instance");
         assert!(ytdl.is_installed().await);
 
         let workdir = tempfile::tempdir().expect("Could not create temp dir");

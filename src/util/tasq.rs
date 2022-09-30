@@ -18,10 +18,10 @@ pub struct TasqResponse<T> {
 
 impl Tasq {
     /// Create a new Tasq client. The URL should already include the list ID.
-    fn new(url: String, client: Option<Client>) -> Self {
+    pub async fn new(url: String, client: Option<Client>) -> anyhow::Result<Self> {
         debug!("Creating Tasq client with URL {}", url);
         let client = client.unwrap_or_else(|| Client::new());
-        Tasq { url, client }
+        Ok(Tasq { url, client })
     }
 }
 
@@ -88,7 +88,9 @@ mod test {
             .expect(1)
             .create();
 
-        let tasq = Tasq::new(mockito::server_url(), None);
+        let tasq = Tasq::new(mockito::server_url(), None)
+            .await
+            .expect("Could not create Tasq client");
         let res = tasq
             .insert("wowzers".to_string())
             .await
@@ -107,7 +109,9 @@ mod test {
             .expect(1)
             .create();
 
-        let tasq = Tasq::new(mockito::server_url(), None);
+        let tasq = Tasq::new(mockito::server_url(), None)
+            .await
+            .expect("Could not create Tasq client");
         let res = tasq.list().await.expect("failed to list");
         assert_eq!(res.tasks, vec!["test:wowzers"]);
         assert_eq!(res.count, 1);
@@ -126,7 +130,9 @@ mod test {
             .expect(1)
             .create();
 
-        let tasq = Tasq::new(mockito::server_url(), None);
+        let tasq = Tasq::new(mockito::server_url(), None)
+            .await
+            .expect("Could not create Tasq client");
         let res = tasq.consume().await.expect("failed to consume");
         assert_eq!(res.key, "test:wowzers");
         assert_eq!(res.data, "wowzers");

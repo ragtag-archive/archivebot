@@ -34,6 +34,7 @@ actix-web-validator = "5"
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, features = [
   "json", "cookies", "rustls-tls-webpki-roots", "stream"] }
+zip = { version = "0.6", default-features = false, features = ["deflate", "bzip2"] }
 
 [dev-dependencies]
 mockito = "0.31.0"
