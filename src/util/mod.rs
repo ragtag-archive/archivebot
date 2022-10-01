@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-mod github;
+pub mod archive;
+pub mod github;
 pub mod rclone;
 pub mod tasq;
 pub mod ytdl;
@@ -45,7 +46,7 @@ pub struct VideoDownloadResult {
 
 #[async_trait]
 pub trait VideoDownloader {
-    async fn download(&self, url: &str, destination: &Path) -> anyhow::Result<VideoDownloadResult>;
+    async fn download(&self, url: &str, workdir: &Path) -> anyhow::Result<VideoDownloadResult>;
 }
 
 #[async_trait]
@@ -57,4 +58,10 @@ pub trait Uploader {
 pub trait SelfInstallable {
     async fn is_installed(&self) -> bool;
     async fn install(&self) -> anyhow::Result<()>;
+}
+
+#[async_trait]
+pub trait ArchiveSite {
+    async fn is_archived(&self, id: &str) -> anyhow::Result<bool>;
+    async fn archive(&self, id: &str, metadata: serde_json::Value) -> anyhow::Result<()>;
 }

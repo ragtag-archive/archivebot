@@ -17,13 +17,13 @@ pub struct YTDL {
 #[async_trait]
 impl VideoDownloader for YTDL {
     /// Download a video from YouTube.
-    async fn download(&self, url: &str, destination: &Path) -> anyhow::Result<VideoDownloadResult> {
+    async fn download(&self, url: &str, workdir: &Path) -> anyhow::Result<VideoDownloadResult> {
         info!("Downloading {}", url);
 
         // Download the video
         let mut cmd = Command::new(&self.ytdlp_path);
         let cmd = cmd
-            .current_dir(destination)
+            .current_dir(workdir)
             .args(&[
                 "-f",
                 "bestvideo[protocol*=https]+bestaudio",
