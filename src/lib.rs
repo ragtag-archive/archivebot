@@ -16,20 +16,23 @@ pub async fn run() -> anyhow::Result<()> {
         config::Config::from_env().map_err(|e| anyhow::anyhow!("Failed to get config: {}", e))?;
 
     // Instantiate modules
-    let (tasq, ytdlp, rclone) = tokio::join!(
+    let (tasq, ytdlp, meta, rclone) = tokio::join!(
         util::tasq::Tasq::new(cfg.tasq_url, None),
         util::ytdl::YTDL::new(),
+        util::metadata::YTMetadataExtractor::new(cfg.youtube_api_key, None),
         util::rclone::Rclone::new(cfg.rclone_remote_name, cfg.rclone_base_directory),
     );
 
     let tasq = Box::new(tasq.map_err(|e| anyhow::anyhow!("Could not create Tasq client: {}", e))?);
     let ytdlp =
         Box::new(ytdlp.map_err(|e| anyhow::anyhow!("Could not create YTDL client: {}", e))?);
+    let meta =
+        Box::new(meta.map_err(|e| anyhow::anyhow!("Could not create metadata extractor: {}", e))?);
     let rclone =
         Box::new(rclone.map_err(|e| anyhow::anyhow!("Could not create Rclone client: {}", e))?);
     let ragtag = Box::new(util::archive::Ragtag::default());
 
-    let bot = archiver::ArchiveBot::new(tasq, ytdlp, rclone, ragtag);
+    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag);
 
     info!("{} running", APP_NAME);
     bot.run_one()

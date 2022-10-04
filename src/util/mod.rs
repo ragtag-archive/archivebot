@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 pub mod archive;
 pub mod github;
+pub mod metadata;
 pub mod rclone;
 pub mod tasq;
 pub mod ytdl;
@@ -68,36 +69,36 @@ pub struct Metadata {
     pub upload_date: String,
     pub title: String,
     pub description: String,
-    pub duration: i32,
+    pub duration: u64,
     pub width: i32,
     pub height: i32,
     pub fps: i32,
     pub format_id: String,
-    pub view_count: i32,
-    pub like_count: i32,
-    pub dislike_count: i32,
+    pub view_count: u64,
+    pub like_count: u64,
+    pub dislike_count: i64,
     pub files: Vec<MetadataFileEntry>,
     pub drive_base: String,
     pub archived_timestamp: String,
-    pub timestamps: MetadataTimestamps,
+    pub timestamps: Option<MetadataTimestamps>,
 }
 
 #[derive(Serialize)]
 pub struct MetadataFileEntry {
     pub name: String,
-    pub size: i32,
+    pub size: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct MetadataTimestamps {
     #[serde(rename = "actualStartTime")]
-    pub actual_start_time: String,
+    pub actual_start_time: Option<String>,
     #[serde(rename = "publishedAt")]
-    pub published_at: String,
+    pub published_at: Option<String>,
     #[serde(rename = "scheduledStartTime")]
-    pub scheduled_start_time: String,
+    pub scheduled_start_time: Option<String>,
     #[serde(rename = "actualEndTime")]
-    pub actual_end_time: String,
+    pub actual_end_time: Option<String>,
 }
 
 #[async_trait]

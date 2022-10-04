@@ -3,6 +3,7 @@ use crate::util;
 pub struct ArchiveBot {
     task_queue: Box<dyn util::TaskQueue>,
     video_downloader: Box<dyn util::VideoDownloader>,
+    metadata_extractor: Box<dyn util::MetadataExtractor<Metadata = util::Metadata>>,
     uploader: Box<dyn util::Uploader>,
     archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
 }
@@ -11,12 +12,14 @@ impl ArchiveBot {
     pub fn new(
         task_queue: Box<dyn util::TaskQueue>,
         video_downloader: Box<dyn util::VideoDownloader>,
+        metadata_extractor: Box<dyn util::MetadataExtractor<Metadata = util::Metadata>>,
         uploader: Box<dyn util::Uploader>,
         archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
     ) -> Self {
         Self {
             task_queue,
             video_downloader,
+            metadata_extractor,
             uploader,
             archive_site,
         }
@@ -56,13 +59,24 @@ impl ArchiveBot {
             ));
         }
 
+        // Extract metadata
+        let metadata = self
+            .metadata_extractor
+            .extract(destination.path())
+            .await
+            .map_err(|e| anyhow::anyhow!("Could not extract metadata: {}", e))?;
+
         // Upload the video
         self.uploader
             .upload(destination.path(), &video_id)
             .await
             .map_err(|e| anyhow::anyhow!("Could not upload video: {}", e))?;
 
-        // TODO: extract metadata, construct database entry, and upload to archive site
+        // Add the video to the archive
+        self.archive_site
+            .archive(&video_id, &metadata)
+            .await
+            .map_err(|e| anyhow::anyhow!("Could not archive video: {}", e))?;
 
         Ok(())
     }
@@ -119,6 +133,37 @@ mod test {
         }
     }
 
+    // Mock the metadata extractor
+    struct MockMetadataExtractor;
+    #[async_trait]
+    impl util::MetadataExtractor for MockMetadataExtractor {
+        type Metadata = util::Metadata;
+
+        async fn extract(&self, video_path: &Path) -> anyhow::Result<Self::Metadata> {
+            assert!(video_path.exists(), "Video path does not exist");
+            Ok(util::Metadata {
+                video_id: "dQw4w9WgXcQ".into(),
+                channel_name: "Rick Astley".into(),
+                channel_id: "UCuAXFkgsw1L7xaCfnd5JJOw".into(),
+                upload_date: "2008-11-25".into(),
+                title: "Rick Astley - Never Gonna Give You Up (Video)".into(),
+                description: "Rick Astley's official music video for “Never Gonna Give You Up” Listen to Rick Astley: https://RickAstley.lnk.to/_listenYD Subscribe to the official Rick Astley YouTube channel: https://RickAstley.lnk.to/_subscribeYD #RickAstley #NeverGonnaGiveYouUp #Vevo #Pop #OfficialMusicVideo".into(),
+                duration: 212,
+                width: 1280,
+                height: 720,
+                fps: 30,
+                format_id: "22".into(),
+                view_count: 2250000000,
+                like_count: 999999,
+                dislike_count: -1,
+                files: vec![],
+                drive_base: "blah".into(),
+                archived_timestamp: chrono::Utc::now().to_rfc3339(),
+                timestamps: None,
+            })
+        }
+    }
+
     // Mock the Rclone client
     struct MockRclone;
     #[async_trait]
@@ -139,8 +184,9 @@ mod test {
             Ok(false)
         }
 
-        async fn archive(&self, _video_id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
-            unimplemented!()
+        async fn archive(&self, video_id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
+            assert_eq!(video_id, "dQw4w9WgXcQ", "Unexpected video ID");
+            Ok(())
         }
     }
 
@@ -149,6 +195,7 @@ mod test {
         let bot = ArchiveBot::new(
             Box::new(MockTasq),
             Box::new(MockYTDL),
+            Box::new(MockMetadataExtractor),
             Box::new(MockRclone),
             Box::new(MockArchiveSite),
         );

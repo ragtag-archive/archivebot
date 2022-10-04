@@ -1,16 +1,28 @@
-pub struct Config {
-    pub tasq_url: String,
-    pub rclone_remote_name: String,
-    pub rclone_base_directory: String,
+// Macro to generate a config struct from a list of fields.
+macro_rules! envcfg {
+    ($($name:ident),*) => {
+        pub struct Config {
+            $(
+                pub $name: String,
+            )*
+        }
+
+        impl Config {
+            pub fn from_env() -> anyhow::Result<Self> {
+                Ok(Config {
+                    $(
+                        $name: std::env::var(stringify!($name).to_string().to_uppercase())
+                            .map_err(|_| anyhow::anyhow!("Missing environment variable {}", stringify!($name).to_string().to_uppercase()))?,
+                    )*
+                })
+            }
+        }
+    };
 }
 
-impl Config {
-    pub fn from_env() -> anyhow::Result<Self> {
-        let config = Config {
-            tasq_url: std::env::var("TASQ_URL")?,
-            rclone_remote_name: std::env::var("RCLONE_REMOTE_NAME")?,
-            rclone_base_directory: std::env::var("RCLONE_BASE_DIRECTORY")?,
-        };
-        Ok(config)
-    }
-}
+envcfg!(
+    tasq_url,
+    rclone_remote_name,
+    rclone_base_directory,
+    youtube_api_key
+);
