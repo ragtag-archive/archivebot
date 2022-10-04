@@ -14,84 +14,6 @@ pub struct YTDL {
     ffmpeg_path: PathBuf,
 }
 
-#[async_trait]
-impl VideoDownloader for YTDL {
-    /// Download a video from YouTube.
-    async fn download(&self, url: &str, workdir: &Path) -> anyhow::Result<VideoDownloadResult> {
-        info!("Downloading {}", url);
-
-        // Download the video
-        let mut cmd = Command::new(&self.ytdlp_path);
-        let cmd = cmd
-            .current_dir(workdir)
-            .args(&[
-                "-f",
-                "bestvideo[protocol*=https]+bestaudio",
-                "--ffmpeg-location",
-                &self.ffmpeg_path.to_string_lossy(),
-                // Subtitles
-                "--write-subs",
-                "--sub-format",
-                "srv3/best",
-                "--sub-langs",
-                "all,-live_chat",
-                // Metadata
-                "--write-thumbnail",
-                "--write-comments",
-                "--write-thumbnail",
-                // Embed
-                "--embed-subs",
-                "--embed-metadata",
-                "--embed-info-json",
-                "--embed-chapters",
-                // Output
-                "--merge-output-format",
-                "webm/mp4/mkv",
-                "--output",
-                "%(id)s.%(ext)s",
-            ])
-            .arg(url);
-
-        debug!("Running command: {:?}", cmd);
-        let output = cmd.output().await?;
-
-        info!("yt-dlp finished {}", url);
-        Ok(VideoDownloadResult { output })
-    }
-}
-
-#[async_trait]
-impl SelfInstallable for YTDL {
-    /// Check whether the executables exist and can be executed.
-    async fn is_installed(&self) -> bool {
-        Command::new(&self.ytdlp_path)
-            .arg("--version")
-            .output()
-            .await
-            .is_ok()
-            && Command::new(&self.ffmpeg_path)
-                .arg("-version")
-                .output()
-                .await
-                .is_ok()
-    }
-
-    /// Install the latest version of yt-dlp from GitHub.
-    async fn install(&self) -> anyhow::Result<()> {
-        info!("Installing yt-dlp and ffmpeg");
-
-        let (ytdlp, ffmpeg) = tokio::join!(
-            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
-            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
-        );
-
-        ytdlp?;
-        ffmpeg?;
-
-        Ok(())
-    }
-}
-
 impl YTDL {
     /// Create a new instance of yt-dlp. If the executable is not found, it will
     /// be downloaded.
@@ -138,6 +60,125 @@ impl YTDL {
 
         Ok(())
     }
+
+    async fn download_video(
+        &self,
+        url: &str,
+        workdir: &Path,
+    ) -> std::io::Result<std::process::Output> {
+        let mut cmd = Command::new(&self.ytdlp_path);
+        let cmd = cmd
+            .current_dir(workdir)
+            .args(&[
+                "-f",
+                "bestvideo[protocol*=https]+bestaudio",
+                "--ffmpeg-location",
+                &self.ffmpeg_path.to_string_lossy(),
+                // Subtitles
+                "--write-subs",
+                "--sub-format",
+                "srv3/best",
+                "--sub-langs",
+                "all,-live_chat",
+                // Metadata
+                "--write-thumbnail",
+                "--write-comments",
+                "--write-info-json",
+                // Embed
+                "--embed-subs",
+                "--embed-metadata",
+                "--embed-info-json",
+                "--embed-chapters",
+                // Output
+                "--merge-output-format",
+                "webm/mp4/mkv",
+                "--output",
+                "%(id)s.%(ext)s",
+            ])
+            .arg(url);
+
+        debug!("Downloading video with command: {:?}", cmd);
+        cmd.output().await
+    }
+
+    async fn download_live_chat(
+        &self,
+        url: &str,
+        workdir: &Path,
+    ) -> std::io::Result<std::process::Output> {
+        let mut cmd = Command::new(&self.ytdlp_path);
+        let cmd = cmd
+            .current_dir(workdir)
+            .args(&[
+                "--skip-download",
+                "--write-subs",
+                "--sub-langs",
+                "live_chat",
+                "--sub-format",
+                "json",
+                "--output",
+                "%(id)s.%(ext)s",
+            ])
+            .arg(url);
+
+        debug!("Downloading live chat with command: {:?}", cmd);
+        cmd.output().await
+    }
+}
+
+#[async_trait]
+impl VideoDownloader for YTDL {
+    /// Download a video from YouTube.
+    async fn download(&self, url: &str, workdir: &Path) -> anyhow::Result<VideoDownloadResult> {
+        info!("Downloading {}", url);
+
+        // Download video and live chat concurrently
+        let (video, live_chat) = tokio::join!(
+            self.download_video(url, workdir),
+            self.download_live_chat(url, workdir),
+        );
+
+        let output = video.map_err(|e| anyhow::anyhow!("Could not download video: {}", e))?;
+        if let Err(e) = live_chat {
+            warn!("Could not download live chat: {}", e);
+        }
+
+        // Download the video
+        info!("yt-dlp finished {}", url);
+        Ok(VideoDownloadResult { output })
+    }
+}
+
+#[async_trait]
+impl SelfInstallable for YTDL {
+    /// Check whether the executables exist and can be executed.
+    async fn is_installed(&self) -> bool {
+        Command::new(&self.ytdlp_path)
+            .arg("--version")
+            .output()
+            .await
+            .is_ok()
+            && Command::new(&self.ffmpeg_path)
+                .arg("-version")
+                .output()
+                .await
+                .is_ok()
+    }
+
+    /// Install the latest version of yt-dlp from GitHub.
+    async fn install(&self) -> anyhow::Result<()> {
+        info!("Installing yt-dlp and ffmpeg");
+
+        let (ytdlp, ffmpeg) = tokio::join!(
+            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
+            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
+        );
+
+        ytdlp.map_err(|e| anyhow::anyhow!("Could not install yt-dlp: {}", e))?;
+        ffmpeg.map_err(|e| anyhow::anyhow!("Could not install ffmpeg: {}", e))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -151,6 +192,8 @@ mod test {
         assert!(ytdl.is_installed().await);
 
         let workdir = tempfile::tempdir().expect("Could not create temp dir");
+        println!("Workdir: {:?}", workdir);
+
         let result = ytdl
             .download(
                 "https://www.youtube.com/watch?v=stmZAThUl64",
@@ -171,14 +214,34 @@ mod test {
             .await
             .expect("Could not read workdir");
 
-        // Check that the requested files exist
+        let mut file_names = Vec::new();
         while let Some(file) = files.next_entry().await.expect("Could not read workdir") {
             let filename = file.file_name().into_string().unwrap();
-            assert!(
-                filename.starts_with("stmZAThUl64"),
-                "Unexpected file: {}",
-                filename
-            );
+            file_names.push(filename.clone());
         }
+        println!("Files: {:?}", file_names);
+
+        // Check that the requested files exist
+        let expected_files = vec![
+            "stmZAThUl64.webm",
+            "stmZAThUl64.webp",
+            "stmZAThUl64.en.srv3",
+            "stmZAThUl64.id.srv3",
+            "stmZAThUl64.ja.srv3",
+            "stmZAThUl64.info.json",
+            "stmZAThUl64.live_chat.json",
+        ];
+        assert!(
+            expected_files
+                .iter()
+                .all(|f| file_names.iter().any(|n| n == f)),
+            "Not all expected files were downloaded"
+        );
+        assert!(
+            file_names
+                .iter()
+                .all(|f| expected_files.iter().any(|n| n == f)),
+            "Unexpected files were present in the workdir"
+        );
     }
 }

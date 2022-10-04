@@ -39,6 +39,8 @@ struct Total {
 
 #[async_trait]
 impl ArchiveSite for Ragtag {
+    type Metadata = super::Metadata;
+
     async fn is_archived(&self, id: &str) -> anyhow::Result<bool> {
         self.client
             .get(
@@ -57,7 +59,7 @@ impl ArchiveSite for Ragtag {
             .map_err(|e| anyhow::anyhow!("Could not parse response: {}", e))
     }
 
-    async fn archive(&self, _id: &str, _metadata: serde_json::Value) -> anyhow::Result<()> {
+    async fn archive(&self, _id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
         unimplemented!();
     }
 }

@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-static RCLONE_RELEASE_URL: &str = "https://downloads.rclone.org/rclone-current-linux-amd64.zip";
-
 pub struct Rclone {
     rclone_path: PathBuf,
     remote_name: String,

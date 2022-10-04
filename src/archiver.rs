@@ -4,7 +4,7 @@ pub struct ArchiveBot {
     task_queue: Box<dyn util::TaskQueue>,
     video_downloader: Box<dyn util::VideoDownloader>,
     uploader: Box<dyn util::Uploader>,
-    archive_site: Box<dyn util::ArchiveSite>,
+    archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
 }
 
 impl ArchiveBot {
@@ -12,7 +12,7 @@ impl ArchiveBot {
         task_queue: Box<dyn util::TaskQueue>,
         video_downloader: Box<dyn util::VideoDownloader>,
         uploader: Box<dyn util::Uploader>,
-        archive_site: Box<dyn util::ArchiveSite>,
+        archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
     ) -> Self {
         Self {
             task_queue,
@@ -132,16 +132,14 @@ mod test {
     struct MockArchiveSite;
     #[async_trait]
     impl util::ArchiveSite for MockArchiveSite {
+        type Metadata = util::Metadata;
+
         async fn is_archived(&self, video_id: &str) -> anyhow::Result<bool> {
             assert_eq!(video_id, "dQw4w9WgXcQ", "Unexpected video ID");
             Ok(false)
         }
 
-        async fn archive(
-            &self,
-            _video_id: &str,
-            _metadata: serde_json::Value,
-        ) -> anyhow::Result<()> {
+        async fn archive(&self, _video_id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
             unimplemented!()
         }
     }
