@@ -1,3 +1,4 @@
+use anyhow::Context;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -9,12 +10,30 @@ pub mod rclone;
 pub mod tasq;
 pub mod ytdl;
 
-async fn get_cache_dir() -> anyhow::Result<PathBuf> {
+pub async fn get_cache_dir() -> anyhow::Result<PathBuf> {
     let cache_dir = dirs::cache_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
         .join("archivebot");
     tokio::fs::create_dir_all(&cache_dir).await?;
     Ok(cache_dir)
+}
+
+pub async fn tempfile() -> anyhow::Result<std::fs::File> {
+    tempfile::tempfile_in(
+        get_cache_dir()
+            .await
+            .context("Could not get cache directory")?,
+    )
+    .map_err(|e| e.into())
+}
+
+pub async fn tempdir() -> anyhow::Result<tempfile::TempDir> {
+    tempfile::tempdir_in(
+        get_cache_dir()
+            .await
+            .context("Could not get cache directory")?,
+    )
+    .map_err(|e| e.into())
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,15 +122,11 @@ pub struct MetadataTimestamps {
 
 #[async_trait]
 pub trait ArchiveSite {
-    type Metadata;
-
     async fn is_archived(&self, id: &str) -> anyhow::Result<bool>;
-    async fn archive(&self, id: &str, metadata: &Self::Metadata) -> anyhow::Result<()>;
+    async fn archive(&self, id: &str, metadata: &Metadata) -> anyhow::Result<()>;
 }
 
 #[async_trait]
 pub trait MetadataExtractor {
-    type Metadata;
-
-    async fn extract(&self, workdir: &Path) -> anyhow::Result<Self::Metadata>;
+    async fn extract(&self, workdir: &Path) -> anyhow::Result<Metadata>;
 }

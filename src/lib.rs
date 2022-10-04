@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+
+use anyhow::Context;
 #[macro_use]
 extern crate log;
 
@@ -12,8 +14,8 @@ pub async fn run() -> anyhow::Result<()> {
     info!("{} starting", APP_NAME);
 
     // Get the config
-    let cfg =
-        config::Config::from_env().map_err(|e| anyhow::anyhow!("Failed to get config: {}", e))?;
+    debug!("Loading config");
+    let cfg = config::Config::from_env().context("Could not load config")?;
 
     // Instantiate modules
     let (tasq, ytdlp, meta, rclone) = tokio::join!(
@@ -23,21 +25,20 @@ pub async fn run() -> anyhow::Result<()> {
         util::rclone::Rclone::new(cfg.rclone_remote_name, cfg.rclone_base_directory),
     );
 
-    let tasq = Box::new(tasq.map_err(|e| anyhow::anyhow!("Could not create Tasq client: {}", e))?);
-    let ytdlp =
-        Box::new(ytdlp.map_err(|e| anyhow::anyhow!("Could not create YTDL client: {}", e))?);
-    let meta =
-        Box::new(meta.map_err(|e| anyhow::anyhow!("Could not create metadata extractor: {}", e))?);
-    let rclone =
-        Box::new(rclone.map_err(|e| anyhow::anyhow!("Could not create Rclone client: {}", e))?);
+    let tasq = Box::new(tasq.context("Could not create Tasq client")?);
+    let ytdlp = Box::new(ytdlp.context("Could not create YTDL client")?);
+    let meta = Box::new(meta.context("Could not create metadata extractor")?);
+    let rclone = Box::new(rclone.context("Could not create Rclone client")?);
     let ragtag = Box::new(util::archive::Ragtag::default());
 
     let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag);
 
     info!("{} running", APP_NAME);
-    bot.run_one()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failure during archival: {}", e))?;
+    tokio::select! {
+        _ = bot.run_forever() => unreachable!(),
+        _ = tokio::signal::ctrl_c() =>
+            info!("Signal received, shutting down"),
+    };
 
     info!("Bye!");
     Ok(())

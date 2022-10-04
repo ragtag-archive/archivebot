@@ -1,20 +1,22 @@
 use crate::util;
+use anyhow::Context;
+use tokio::time::{sleep, Duration};
 
 pub struct ArchiveBot {
     task_queue: Box<dyn util::TaskQueue>,
     video_downloader: Box<dyn util::VideoDownloader>,
-    metadata_extractor: Box<dyn util::MetadataExtractor<Metadata = util::Metadata>>,
+    metadata_extractor: Box<dyn util::MetadataExtractor>,
     uploader: Box<dyn util::Uploader>,
-    archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
+    archive_site: Box<dyn util::ArchiveSite>,
 }
 
 impl ArchiveBot {
     pub fn new(
         task_queue: Box<dyn util::TaskQueue>,
         video_downloader: Box<dyn util::VideoDownloader>,
-        metadata_extractor: Box<dyn util::MetadataExtractor<Metadata = util::Metadata>>,
+        metadata_extractor: Box<dyn util::MetadataExtractor>,
         uploader: Box<dyn util::Uploader>,
-        archive_site: Box<dyn util::ArchiveSite<Metadata = util::Metadata>>,
+        archive_site: Box<dyn util::ArchiveSite>,
     ) -> Self {
         Self {
             task_queue,
@@ -25,31 +27,61 @@ impl ArchiveBot {
         }
     }
 
+    pub async fn run_forever(&self) -> ! {
+        let mut backoff_delay = Duration::from_secs(30);
+
+        loop {
+            info!("Getting next task now");
+            match self.run_one().await {
+                Ok(_) => {
+                    info!("Successfully processed task");
+                    backoff_delay = Duration::from_secs(30);
+                }
+                Err(e) => {
+                    error!("Failure during archival: {:#}", e);
+                    info!("Backing off for {} seconds", backoff_delay.as_secs());
+                    sleep(backoff_delay).await;
+                    backoff_delay *= 2;
+
+                    if backoff_delay > Duration::from_secs(60 * 60) {
+                        backoff_delay = Duration::from_secs(60 * 60);
+                    }
+                }
+            }
+        }
+    }
+
     pub async fn run_one(&self) -> anyhow::Result<()> {
         // Get a task from the queue
+        info!("Getting next task from queue");
         let task = self
             .task_queue
             .consume()
             .await
-            .map_err(|e| anyhow::anyhow!("Could not consume task: {}", e))?;
+            .context("Could not get next task from queue")?;
 
+        info!("Got task: {:?}", task);
         let video_id = task.data;
         let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
 
         // Ensure the video doesn't already exist in the archive
         if self.archive_site.is_archived(&video_id).await? {
-            info!("Video already archived");
+            info!("Video already archived, skipping");
             return Ok(());
         }
 
         // Download the video
-        let destination = tempfile::tempdir()
-            .map_err(|e| anyhow::anyhow!("Could not create temp dir for video download: {}", e))?;
+        debug!("Creating temporary directory");
+        let destination = util::tempdir()
+            .await
+            .context("Could not create temporary directory")?;
+
+        info!("Downloading video {}", video_url);
         let dl_res = self
             .video_downloader
             .download(&video_url, destination.path())
             .await
-            .map_err(|e| anyhow::anyhow!("Could not download video: {}", e))?;
+            .context("Could not download video")?;
 
         if !dl_res.output.status.success() {
             return Err(anyhow::anyhow!(
@@ -64,19 +96,19 @@ impl ArchiveBot {
             .metadata_extractor
             .extract(destination.path())
             .await
-            .map_err(|e| anyhow::anyhow!("Could not extract metadata: {}", e))?;
+            .context("Could not extract metadata")?;
 
         // Upload the video
         self.uploader
             .upload(destination.path(), &video_id)
             .await
-            .map_err(|e| anyhow::anyhow!("Could not upload video: {}", e))?;
+            .context("Could not upload video")?;
 
         // Add the video to the archive
         self.archive_site
             .archive(&video_id, &metadata)
             .await
-            .map_err(|e| anyhow::anyhow!("Could not archive video: {}", e))?;
+            .context("Could not add video to archive")?;
 
         Ok(())
     }
@@ -137,9 +169,7 @@ mod test {
     struct MockMetadataExtractor;
     #[async_trait]
     impl util::MetadataExtractor for MockMetadataExtractor {
-        type Metadata = util::Metadata;
-
-        async fn extract(&self, video_path: &Path) -> anyhow::Result<Self::Metadata> {
+        async fn extract(&self, video_path: &Path) -> anyhow::Result<util::Metadata> {
             assert!(video_path.exists(), "Video path does not exist");
             Ok(util::Metadata {
                 video_id: "dQw4w9WgXcQ".into(),
@@ -177,14 +207,12 @@ mod test {
     struct MockArchiveSite;
     #[async_trait]
     impl util::ArchiveSite for MockArchiveSite {
-        type Metadata = util::Metadata;
-
         async fn is_archived(&self, video_id: &str) -> anyhow::Result<bool> {
             assert_eq!(video_id, "dQw4w9WgXcQ", "Unexpected video ID");
             Ok(false)
         }
 
-        async fn archive(&self, video_id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
+        async fn archive(&self, video_id: &str, _metadata: &util::Metadata) -> anyhow::Result<()> {
             assert_eq!(video_id, "dQw4w9WgXcQ", "Unexpected video ID");
             Ok(())
         }

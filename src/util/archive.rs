@@ -1,4 +1,5 @@
-use super::ArchiveSite;
+use super::{ArchiveSite, Metadata};
+use anyhow::Context;
 use async_trait::async_trait;
 use serde::Deserialize;
 
@@ -39,27 +40,25 @@ struct Total {
 
 #[async_trait]
 impl ArchiveSite for Ragtag {
-    type Metadata = super::Metadata;
-
     async fn is_archived(&self, id: &str) -> anyhow::Result<bool> {
         self.client
             .get(
                 self.url
                     .join(&format!("api/v1/search?v={}", id))
-                    .map_err(|e| anyhow::anyhow!("Failed to construct search URL: {}", e))?,
+                    .context("Could not construct search URL")?,
             )
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send search request: {}", e))?
+            .context("Could not send search request")?
             .error_for_status()
-            .map_err(|e| anyhow::anyhow!("Search request failed: {}", e))?
+            .context("Got unexpected status code")?
             .json::<SearchResult>()
             .await
             .map(|r| r.hits.total.value > 0)
-            .map_err(|e| anyhow::anyhow!("Could not parse response: {}", e))
+            .context("Could not parse search result")
     }
 
-    async fn archive(&self, _id: &str, _metadata: &Self::Metadata) -> anyhow::Result<()> {
+    async fn archive(&self, _id: &str, _metadata: &Metadata) -> anyhow::Result<()> {
         unimplemented!();
     }
 }

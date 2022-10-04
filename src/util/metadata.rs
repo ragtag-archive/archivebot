@@ -1,4 +1,5 @@
-use super::MetadataExtractor;
+use super::{Metadata, MetadataExtractor};
+use anyhow::Context;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
@@ -73,12 +74,12 @@ impl YTMetadataExtractor {
             .get(&url)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send request: {}", e))?
+            .context("Could not send request")?
             .error_for_status()
-            .map_err(|e| anyhow::anyhow!("Request failed: {}", e))?
+            .context("Unexpected status code")?
             .json::<YTTSResponse>()
             .await
-            .map_err(|e| anyhow::anyhow!("Could not parse response: {}", e))?;
+            .context("Could not parse response")?;
 
         let item = resp
             .items
@@ -106,9 +107,7 @@ impl YTMetadataExtractor {
 
 #[async_trait]
 impl MetadataExtractor for YTMetadataExtractor {
-    type Metadata = super::Metadata;
-
-    async fn extract(&self, workdir: &std::path::Path) -> anyhow::Result<Self::Metadata> {
+    async fn extract(&self, workdir: &std::path::Path) -> anyhow::Result<Metadata> {
         // Scan all files in the workdir
         let mut files = vec![];
         let mut dirents = tokio::fs::read_dir(workdir).await?;
@@ -126,7 +125,7 @@ impl MetadataExtractor for YTMetadataExtractor {
         // Look for *.info.json
         let info_json = workdir
             .read_dir()
-            .map_err(|e| anyhow::anyhow!("Could not read directory: {}", e))?
+            .context("Could not read workdir")?
             .find_map(|entry| {
                 let path = entry.ok()?.path();
                 let fname = path.file_name()?.to_str()?;
@@ -141,15 +140,15 @@ impl MetadataExtractor for YTMetadataExtractor {
         // Deserialize
         let info_json = tokio::fs::read_to_string(info_json)
             .await
-            .map_err(|e| anyhow::anyhow!("Could not read info.json: {}", e))?;
-        let info_json: InfoJson = serde_json::from_str(&info_json)
-            .map_err(|e| anyhow::anyhow!("Could not deserialize info.json: {}", e))?;
+            .context("Could not read info.json")?;
+        let info_json: InfoJson =
+            serde_json::from_str(&info_json).context("Could not deserialize info.json")?;
 
         // Get the timestamps
         let timestamps = self.get_timestamps(&info_json.id).await?;
 
         // Map the infojson to our metadata
-        Ok(Self::Metadata {
+        Ok(Metadata {
             video_id: info_json.id,
             channel_name: info_json.uploader,
             channel_id: info_json.channel_id,

@@ -1,4 +1,5 @@
 use super::{SelfInstallable, VideoDownloadResult, VideoDownloader};
+use anyhow::Context;
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -25,7 +26,7 @@ impl YTDL {
         // Ensure the cache directory exists
         tokio::fs::create_dir_all(&cache_dir)
             .await
-            .map_err(|e| anyhow::anyhow!("Could not create cache directory: {}", e))?;
+            .context("Could not create cache directory")?;
 
         let ytdl = Self {
             ytdlp_path,
@@ -36,7 +37,7 @@ impl YTDL {
         if !ytdl.is_installed().await {
             ytdl.install()
                 .await
-                .map_err(|e| anyhow::anyhow!("Could not install yt-dlp and ffmpeg: {}", e))?;
+                .context("Could not install yt-dlp and ffmpeg")?;
         }
 
         Ok(ytdl)
@@ -133,19 +134,34 @@ impl VideoDownloader for YTDL {
         info!("Downloading {}", url);
 
         // Download video and live chat concurrently
-        let (video, live_chat) = tokio::join!(
+        let (video, live_chat) = tokio::try_join!(
             self.download_video(url, workdir),
             self.download_live_chat(url, workdir),
-        );
+        )
+        .context("Failed to spawn command")?;
 
-        let output = video.map_err(|e| anyhow::anyhow!("Could not download video: {}", e))?;
-        if let Err(e) = live_chat {
-            warn!("Could not download live chat: {}", e);
+        if !video.status.success() {
+            debug!(
+                "Video download failed with output: {}",
+                String::from_utf8_lossy(&video.stderr)
+            );
+            return Err(anyhow::anyhow!(
+                "yt-dlp exited with non-zero status: {}",
+                video.status
+            ));
+        }
+
+        if !live_chat.status.success() {
+            debug!(
+                "Live chat download failed with output: {}",
+                String::from_utf8_lossy(&live_chat.stderr)
+            );
+            warn!("Could not download live chat: {}", live_chat.status);
         }
 
         // Download the video
         info!("yt-dlp finished {}", url);
-        Ok(VideoDownloadResult { output })
+        Ok(VideoDownloadResult { output: video })
     }
 }
 
@@ -174,8 +190,8 @@ impl SelfInstallable for YTDL {
             Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
         );
 
-        ytdlp.map_err(|e| anyhow::anyhow!("Could not install yt-dlp: {}", e))?;
-        ffmpeg.map_err(|e| anyhow::anyhow!("Could not install ffmpeg: {}", e))?;
+        ytdlp.context("Could not install yt-dlp")?;
+        ffmpeg.context("Could not install ffmpeg")?;
 
         Ok(())
     }
@@ -191,7 +207,9 @@ mod test {
         let ytdl = YTDL::new().await.expect("Could not create yt-dlp instance");
         assert!(ytdl.is_installed().await);
 
-        let workdir = tempfile::tempdir().expect("Could not create temp dir");
+        let workdir = super::super::tempdir()
+            .await
+            .expect("Could not create temp dir");
         println!("Workdir: {:?}", workdir);
 
         let result = ytdl

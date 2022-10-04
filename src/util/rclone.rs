@@ -1,6 +1,7 @@
 use crate::util::github;
 
 use super::{SelfInstallable, Uploader};
+use anyhow::Context;
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -28,10 +29,7 @@ impl Rclone {
 
         // Check if rclone is installed
         if !rclone.is_installed().await {
-            rclone
-                .install()
-                .await
-                .map_err(|e| anyhow::anyhow!("Could not install rclone: {}", e))?;
+            rclone.install().await.context("Could not install rclone")?;
         }
 
         Ok(rclone)
@@ -55,13 +53,13 @@ impl SelfInstallable for Rclone {
 
         // Create the destination file
         let mut destfile = std::fs::File::create(&self.rclone_path)
-            .map_err(|e| anyhow::anyhow!("Failed to create destination file: {}", e))?;
+            .context("Could not create destination file")?;
 
         // Get the latest release info from GitHub
         let client = reqwest::Client::new();
         let release = github::get_latest_release("rclone/rclone", Some(client.clone()))
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to get latest release info: {}", e))?;
+            .context("Could not get latest release info from GitHub")?;
 
         // Get the download URL
         let download_url = release
@@ -77,56 +75,57 @@ impl SelfInstallable for Rclone {
             .get(&download_url)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to fetch rclone release: {}", e))?;
-        let zipfile = tempfile::tempfile()
-            .map_err(|e| anyhow::anyhow!("Failed to create temp file: {}", e))?;
+            .context("Could not fetch zip file")?;
+        let zipfile = super::tempfile()
+            .await
+            .context("Could not create temporary file")?;
         let mut zipfile_async = tokio::fs::File::from_std(
             zipfile
                 .try_clone()
-                .map_err(|e| anyhow::anyhow!("Failed to clone temp file: {}", e))?,
+                .context("Could not clone temporary file")?,
         );
 
         // Write the zip file to a temporary file
         while let Some(chunk) = resp
             .chunk()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read zip chunk: {}", e))?
+            .context("Could not read zip chunk from response")?
         {
             zipfile_async
                 .write_all(&chunk)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to write zip chunk: {}", e))?;
+                .context("Could not write zip chunk to temporary file")?;
         }
 
         // Extract the zip file
         tokio::task::spawn_blocking(move || {
-            let mut archive = zip::ZipArchive::new(zipfile)
-                .map_err(|e| anyhow::anyhow!("Failed to open zip file: {}", e))?;
+            let mut archive =
+                zip::ZipArchive::new(zipfile).context("Could not open zip file for reading")?;
 
             // Find the file
             let file_name = archive
                 .file_names()
                 .find(|name| name.ends_with("rclone"))
-                .ok_or_else(|| anyhow::anyhow!("Failed to find rclone binary in zip file"))?
+                .ok_or_else(|| anyhow::anyhow!("Could not find rclone binary in zip file"))?
                 .to_string();
 
             let mut file = archive
                 .by_name(&file_name)
-                .map_err(|e| anyhow::anyhow!("Failed to find rclone binary in zip file: {}", e))?;
+                .context("Could not find rclone binary in zip file")?;
 
             // Copy the file to the destination
             std::io::copy(&mut file, &mut destfile)
-                .map_err(|e| anyhow::anyhow!("Failed to copy rclone binary: {}", e))?;
+                .context("Could not copy rclone binary to destination")?;
 
             // Make the file executable
             let mut perms = destfile
                 .metadata()
-                .map_err(|e| anyhow::anyhow!("Failed to get file metadata: {}", e))?
+                .context("Could not get file metadata")?
                 .permissions();
             perms.set_mode(0o755);
             destfile
                 .set_permissions(perms)
-                .map_err(|e| anyhow::anyhow!("Failed to set file permissions: {}", e))?;
+                .context("Could not set file permissions")?;
 
             Ok::<_, anyhow::Error>(())
         })
