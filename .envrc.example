@@ -1,0 +1,14 @@
+export ARCHIVE_BASE_URL=https://archive.ragtag.moe
+export TASQ_URL=
+export RCLONE_CONFIG_DATA='
+[localstack]
+type = s3
+provider = Other
+access_key_id = ak
+secret_access_key = sak
+endpoint = http://localhost:4566
+acl = public-read
+'
+export RCLONE_REMOTE_NAME=localstack
+export RCLONE_BASE_DIRECTORY=test
+export YOUTUBE_API_KEY=

@@ -23,7 +23,9 @@ macro_rules! envcfg {
 }
 
 envcfg!(
+    archive_base_url,
     tasq_url,
+    rclone_config_data,
     rclone_remote_name,
     rclone_base_directory,
     youtube_api_key

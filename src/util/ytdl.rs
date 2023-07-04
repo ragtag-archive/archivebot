@@ -69,10 +69,11 @@ impl YTDL {
     ) -> std::io::Result<std::process::Output> {
         let mut cmd = Command::new(&self.ytdlp_path);
         let cmd = cmd
+            .kill_on_drop(true)
             .current_dir(workdir)
             .args(&[
                 "-f",
-                "bestvideo[protocol*=https]+bestaudio",
+                "bestvideo+bestaudio",
                 "--ffmpeg-location",
                 &self.ffmpeg_path.to_string_lossy(),
                 // Subtitles
@@ -109,6 +110,7 @@ impl YTDL {
     ) -> std::io::Result<std::process::Output> {
         let mut cmd = Command::new(&self.ytdlp_path);
         let cmd = cmd
+            .kill_on_drop(true)
             .current_dir(workdir)
             .args(&[
                 "--skip-download",

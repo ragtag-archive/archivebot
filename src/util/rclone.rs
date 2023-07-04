@@ -12,19 +12,35 @@ pub struct Rclone {
     rclone_path: PathBuf,
     remote_name: String,
     base_directory: String,
+    config_filepath: PathBuf,
 }
 
 impl Rclone {
-    pub async fn new(remote_name: String, base_directory: String) -> anyhow::Result<Self> {
+    pub async fn new(
+        config_data: String,
+        remote_name: String,
+        base_directory: String,
+    ) -> anyhow::Result<Self> {
         debug!(
             "Creating Rclone client with remote {} and base directory {}",
             remote_name, base_directory
         );
 
+        // Write the config file
+        let config_filepath = super::get_cache_dir().await?.join("rclone.conf");
+        let mut config_file = tokio::fs::File::create(&config_filepath)
+            .await
+            .context("Could not create rclone config file")?;
+        config_file
+            .write_all(config_data.as_bytes())
+            .await
+            .context("Could not write rclone config file")?;
+
         let rclone = Rclone {
             rclone_path: super::get_cache_dir().await?.join("rclone"),
             remote_name,
             base_directory,
+            config_filepath,
         };
 
         // Check if rclone is installed
@@ -137,6 +153,8 @@ impl SelfInstallable for Rclone {
 impl Uploader for Rclone {
     async fn upload(&self, source_dir: &Path, target_dir: &str) -> anyhow::Result<()> {
         let output = Command::new("rclone")
+            .arg("--config")
+            .arg(&self.config_filepath)
             .arg("copy")
             .arg(source_dir)
             .arg(format!(
@@ -158,7 +176,7 @@ mod test {
 
     #[tokio::test]
     async fn test_rclone() {
-        let rclone = Rclone::new("test".to_string(), "test".to_string())
+        let rclone = Rclone::new("".to_string(), "test".to_string(), "test".to_string())
             .await
             .expect("Failed to create Rclone client");
         assert!(rclone.is_installed().await);

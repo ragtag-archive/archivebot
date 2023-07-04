@@ -111,7 +111,7 @@ impl MetadataExtractor for YTMetadataExtractor {
         // Scan all files in the workdir
         let mut files = vec![];
         let mut dirents = tokio::fs::read_dir(workdir).await?;
-        for entry in dirents.next_entry().await? {
+        while let Some(entry) = dirents.next_entry().await? {
             let metadata = entry.metadata().await?;
             files.push(super::MetadataFileEntry {
                 name: entry

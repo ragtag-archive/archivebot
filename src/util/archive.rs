@@ -9,17 +9,9 @@ pub struct Ragtag {
 }
 
 impl Ragtag {
-    fn new(url: url::Url, client: reqwest::Client) -> Self {
-        Self { url, client }
-    }
-}
-
-impl Default for Ragtag {
-    fn default() -> Self {
-        Self::new(
-            url::Url::parse("https://archive.ragtag.moe").unwrap(),
-            reqwest::Client::new(),
-        )
+    pub async fn new(url: url::Url, client: Option<reqwest::Client>) -> anyhow::Result<Self> {
+        let client = client.unwrap_or_else(|| reqwest::Client::new());
+        Ok(Self { url, client })
     }
 }
 
@@ -63,6 +55,25 @@ impl ArchiveSite for Ragtag {
     }
 }
 
+pub struct MockRagtag {}
+
+impl MockRagtag {
+    pub async fn new() -> anyhow::Result<Self> {
+        Ok(Self {})
+    }
+}
+
+#[async_trait]
+impl ArchiveSite for MockRagtag {
+    async fn is_archived(&self, _id: &str) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+
+    async fn archive(&self, _id: &str, _metadata: &Metadata) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -87,8 +98,10 @@ mod test {
 
         let ragtag = Ragtag::new(
             url::Url::parse(&mockito::server_url()).expect("Failed to parse mock URL"),
-            reqwest::Client::new(),
-        );
+            None,
+        )
+        .await
+        .unwrap();
         assert!(
             ragtag
                 .is_archived("123")

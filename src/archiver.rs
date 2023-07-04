@@ -62,20 +62,28 @@ impl ArchiveBot {
 
         info!("Got task: {:?}", task);
         let video_id = task.data;
+        self.download_video(&video_id).await
+    }
+
+    pub async fn download_video(&self, video_id: &str) -> anyhow::Result<()> {
         let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
 
         // Ensure the video doesn't already exist in the archive
-        if self.archive_site.is_archived(&video_id).await? {
+        if self.archive_site.is_archived(video_id).await? {
             info!("Video already archived, skipping");
             return Ok(());
         }
 
-        // Download the video
-        debug!("Creating temporary directory");
+        // Create a temporary directory
         let destination = util::tempdir()
             .await
             .context("Could not create temporary directory")?;
+        debug!(
+            "Created temporary directory {}",
+            destination.path().to_str().unwrap_or("???")
+        );
 
+        // Download the video
         info!("Downloading video {}", video_url);
         let dl_res = self
             .video_downloader
@@ -100,13 +108,13 @@ impl ArchiveBot {
 
         // Upload the video
         self.uploader
-            .upload(destination.path(), &video_id)
+            .upload(destination.path(), video_id)
             .await
             .context("Could not upload video")?;
 
         // Add the video to the archive
         self.archive_site
-            .archive(&video_id, &metadata)
+            .archive(video_id, &metadata)
             .await
             .context("Could not add video to archive")?;
 
