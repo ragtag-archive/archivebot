@@ -166,6 +166,13 @@ impl Uploader for Rclone {
             .output()
             .await?;
         debug!("Rclone output: {:?}", output);
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "Rclone exited with status {}",
+                output.status
+            ));
+        }
         Ok(())
     }
 }
