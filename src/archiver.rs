@@ -2,12 +2,36 @@ use crate::util;
 use anyhow::Context;
 use tokio::time::{sleep, Duration};
 
+#[derive(Debug, PartialEq)]
+pub enum ArchiverState {
+    Idle,
+    Starting,
+    FailureBackoff,
+    Downloading,
+    Uploading,
+}
+
+impl std::fmt::Display for ArchiverState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+pub static ARCHIVER_STATES: &[ArchiverState] = &[
+    ArchiverState::Idle,
+    ArchiverState::Starting,
+    ArchiverState::FailureBackoff,
+    ArchiverState::Downloading,
+    ArchiverState::Uploading,
+];
+
 pub struct ArchiveBot {
     task_queue: Box<dyn util::TaskQueue>,
     video_downloader: Box<dyn util::VideoDownloader>,
     metadata_extractor: Box<dyn util::MetadataExtractor>,
     uploader: Box<dyn util::Uploader>,
     archive_site: Box<dyn util::ArchiveSite>,
+    events: Option<tokio::sync::mpsc::UnboundedSender<ArchiverState>>,
 }
 
 impl ArchiveBot {
@@ -17,6 +41,7 @@ impl ArchiveBot {
         metadata_extractor: Box<dyn util::MetadataExtractor>,
         uploader: Box<dyn util::Uploader>,
         archive_site: Box<dyn util::ArchiveSite>,
+        events: Option<tokio::sync::mpsc::UnboundedSender<ArchiverState>>,
     ) -> Self {
         Self {
             task_queue,
@@ -24,6 +49,13 @@ impl ArchiveBot {
             metadata_extractor,
             uploader,
             archive_site,
+            events,
+        }
+    }
+
+    fn send_event(&self, state: ArchiverState) {
+        if let Some(events) = &self.events {
+            let _ = events.send(state);
         }
     }
 
@@ -40,6 +72,7 @@ impl ArchiveBot {
                 Err(e) => {
                     error!("Failure during archival: {:#}", e);
                     info!("Backing off for {} seconds", backoff_delay.as_secs());
+                    self.send_event(ArchiverState::FailureBackoff);
                     sleep(backoff_delay).await;
                     backoff_delay *= 2;
 
@@ -52,6 +85,8 @@ impl ArchiveBot {
     }
 
     pub async fn run_one(&self) -> anyhow::Result<()> {
+        self.send_event(ArchiverState::Starting);
+
         // Get a task from the queue
         info!("Getting next task from queue");
         let task = self
@@ -85,6 +120,7 @@ impl ArchiveBot {
 
         // Download the video
         info!("Downloading video {}", video_url);
+        self.send_event(ArchiverState::Downloading);
         let dl_res = self
             .video_downloader
             .download(&video_url, destination.path())
@@ -100,6 +136,7 @@ impl ArchiveBot {
         }
 
         // Extract metadata
+        info!("Extracting metadata");
         let metadata = self
             .metadata_extractor
             .extract(destination.path())
@@ -107,17 +144,21 @@ impl ArchiveBot {
             .context("Could not extract metadata")?;
 
         // Upload the video
+        info!("Uploading video");
+        self.send_event(ArchiverState::Uploading);
         self.uploader
             .upload(destination.path(), video_id)
             .await
             .context("Could not upload video")?;
 
         // Add the video to the archive
+        info!("Adding video to archive");
         self.archive_site
             .archive(video_id, &metadata)
             .await
             .context("Could not add video to archive")?;
 
+        self.send_event(ArchiverState::Idle);
         Ok(())
     }
 }
@@ -228,13 +269,26 @@ mod test {
 
     #[tokio::test]
     async fn test_run_one() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let bot = ArchiveBot::new(
             Box::new(MockTasq),
             Box::new(MockYTDL),
             Box::new(MockMetadataExtractor),
             Box::new(MockRclone),
             Box::new(MockArchiveSite),
+            Some(tx),
         );
         bot.run_one().await.unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event, ArchiverState::Starting);
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event, ArchiverState::Downloading);
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event, ArchiverState::Uploading);
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event, ArchiverState::Idle);
+        let event = rx.try_recv();
+        assert!(event.is_err());
     }
 }

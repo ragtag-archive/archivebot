@@ -8,10 +8,24 @@ pub mod archiver;
 mod config;
 pub mod util;
 
-pub static APP_NAME: &str = env!("CARGO_PKG_NAME");
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
 
 pub async fn run() -> anyhow::Result<()> {
-    info!("{} starting", APP_NAME);
+    if let (Some(dirty), Some(short_hash)) =
+        (built_info::GIT_DIRTY, built_info::GIT_COMMIT_HASH_SHORT)
+    {
+        info!(
+            "{} {}, v{} ({}{})",
+            built_info::PKG_NAME,
+            built_info::PROFILE,
+            built_info::PKG_VERSION,
+            short_hash,
+            if dirty { ", dirty" } else { "" },
+        );
+        info!("Built on {}", built_info::BUILT_TIME_UTC,);
+    }
 
     // Get the config
     debug!("Loading config");
@@ -48,13 +62,19 @@ pub async fn run() -> anyhow::Result<()> {
     let meta = Box::new(meta.context("Could not create metadata extractor")?);
     let rclone = Box::new(rclone.context("Could not create Rclone client")?);
 
-    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag);
+    // Channel for events
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag, Some(tx));
+    let metrics_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3383));
 
-    info!("{} running", APP_NAME);
+    info!("{} running", built_info::PKG_NAME);
     tokio::select! {
-        _ = bot.run_forever() => unreachable!(),
-        _ = tokio::signal::ctrl_c() =>
-            info!("Signal received, shutting down"),
+        _ = bot.run_forever()
+            => unreachable!(),
+        _ = util::metrics::serve_metrics_endpoint(metrics_addr, rx)
+            => unreachable!(),
+        _ = tokio::signal::ctrl_c()
+            => info!("Signal received, shutting down"),
     };
 
     info!("Bye!");

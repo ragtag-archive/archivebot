@@ -34,11 +34,26 @@ validator = { version = "0.16", features = ["derive"] }
 actix-web-validator = "5"
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, features = [
-  "json", "cookies", "rustls-tls-webpki-roots", "stream"] }
-zip = { version = "0.6", default-features = false, features = ["deflate", "bzip2"] }
+  "json",
+  "cookies",
+  "rustls-tls-webpki-roots",
+  "stream",
+] }
+zip = { version = "0.6", default-features = false, features = [
+  "deflate",
+  "bzip2",
+] }
+hyper = { version = "0.14", features = ["server", "http1", "tcp"] }
 
 [dev-dependencies]
 mockito = "0.31.0"
+
+[build-dependencies]
+built = { version = "0.6.1", features = [
+  "git2",
+  "chrono",
+  "semver",
+] }
 
 [profile.release]
 lto = true

@@ -69,7 +69,8 @@ impl ArchiveSite for MockRagtag {
         Ok(false)
     }
 
-    async fn archive(&self, _id: &str, _metadata: &Metadata) -> anyhow::Result<()> {
+    async fn archive(&self, id: &str, metadata: &Metadata) -> anyhow::Result<()> {
+        info!("[Mock] Archived video {} with metadata {:?}", id, metadata);
         Ok(())
     }
 }

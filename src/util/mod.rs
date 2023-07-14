@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 pub mod archive;
 pub mod github;
 pub mod metadata;
+pub mod metrics;
 pub mod rclone;
 pub mod tasq;
 pub mod ytdl;
@@ -16,6 +17,24 @@ pub async fn get_cache_dir() -> anyhow::Result<PathBuf> {
         .join("archivebot");
     tokio::fs::create_dir_all(&cache_dir).await?;
     Ok(cache_dir)
+}
+
+pub fn dir_size(path: &Path) -> anyhow::Result<u64> {
+    let mut size = 0;
+
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        let path = entry.path();
+
+        if metadata.is_dir() {
+            size += dir_size(&path)?;
+        } else {
+            size += metadata.len();
+        }
+    }
+
+    Ok(size)
 }
 
 pub async fn tempfile() -> anyhow::Result<std::fs::File> {
@@ -80,7 +99,7 @@ pub trait SelfInstallable {
     async fn install(&self) -> anyhow::Result<()>;
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Metadata {
     pub video_id: String,
     pub channel_name: String,
@@ -102,13 +121,13 @@ pub struct Metadata {
     pub timestamps: Option<MetadataTimestamps>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct MetadataFileEntry {
     pub name: String,
     pub size: u64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct MetadataTimestamps {
     #[serde(rename = "actualStartTime")]
     pub actual_start_time: Option<String>,
