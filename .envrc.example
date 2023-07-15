@@ -1,5 +1,6 @@
 export ARCHIVE_BASE_URL=https://archive.ragtag.moe
 export TASQ_URL=
+export DRIVE_BASE=
 export RCLONE_CONFIG_DATA='
 [localstack]
 type = s3

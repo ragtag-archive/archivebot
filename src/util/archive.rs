@@ -50,8 +50,20 @@ impl ArchiveSite for Ragtag {
             .context("Could not parse search result")
     }
 
-    async fn archive(&self, _id: &str, _metadata: &Metadata) -> anyhow::Result<()> {
-        unimplemented!();
+    async fn archive(&self, id: &str, metadata: &Metadata) -> anyhow::Result<()> {
+        self.client
+            .put(
+                self.url
+                    .join(&format!("api/v2/archive/{}", id))
+                    .context("Could not construct archive URL")?,
+            )
+            .body(serde_json::to_string(metadata).context("Could not serialize metadata")?)
+            .send()
+            .await
+            .context("Could not send archive request")?
+            .error_for_status()
+            .context("Got unexpected status code")
+            .map(|_| ())
     }
 }
 

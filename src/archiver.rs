@@ -97,10 +97,10 @@ impl ArchiveBot {
 
         info!("Got task: {:?}", task);
         let video_id = task.data;
-        self.download_video(&video_id).await
+        self.run_video(&video_id).await
     }
 
-    pub async fn download_video(&self, video_id: &str) -> anyhow::Result<()> {
+    pub async fn run_video(&self, video_id: &str) -> anyhow::Result<()> {
         let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
 
         // Ensure the video doesn't already exist in the archive

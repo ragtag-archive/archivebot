@@ -49,7 +49,7 @@ pub async fn run() -> anyhow::Result<()> {
     let (tasq, ytdlp, meta, rclone) = tokio::join!(
         util::tasq::Tasq::new(cfg.tasq_url, None),
         util::ytdl::YTDL::new(),
-        util::metadata::YTMetadataExtractor::new(cfg.youtube_api_key, None),
+        util::metadata::YTMetadataExtractor::new(cfg.youtube_api_key, None, cfg.drive_base),
         util::rclone::Rclone::new(
             cfg.rclone_config_data,
             cfg.rclone_remote_name,

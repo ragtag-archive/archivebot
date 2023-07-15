@@ -26,6 +26,7 @@ pub struct YTMetadataExtractor {
     youtube_api_key: String,
     youtube_api_url: String,
     client: Client,
+    drive_base: String,
 }
 
 #[derive(Deserialize)]
@@ -54,13 +55,18 @@ struct YTTSItemSnippet {
 }
 
 impl YTMetadataExtractor {
-    pub async fn new(youtube_api_key: String, client: Option<Client>) -> anyhow::Result<Self> {
+    pub async fn new(
+        youtube_api_key: String,
+        client: Option<Client>,
+        drive_base: String,
+    ) -> anyhow::Result<Self> {
         let client = client.unwrap_or_else(|| Client::new());
         let youtube_api_url = "https://youtube.googleapis.com".into();
         Ok(Self {
             youtube_api_key,
             youtube_api_url,
             client,
+            drive_base,
         })
     }
 
@@ -164,7 +170,7 @@ impl MetadataExtractor for YTMetadataExtractor {
             like_count: info_json.like_count,
             dislike_count: info_json.dislike_count.unwrap_or(-1),
             files,
-            drive_base: "".to_string(), // TODO
+            drive_base: self.drive_base.clone(),
             archived_timestamp: chrono::Utc::now().to_rfc3339(),
             timestamps: Some(timestamps),
         })
@@ -268,7 +274,7 @@ mod tests {
         let video_id = "test-video-id";
 
         let _m = get_mock_yt(api_key, video_id);
-        let mut extractor = YTMetadataExtractor::new("asdf".to_string(), None)
+        let mut extractor = YTMetadataExtractor::new("asdf".to_string(), None, "drive".to_string())
             .await
             .unwrap();
 

@@ -28,5 +28,6 @@ envcfg!(
     rclone_config_data,
     rclone_remote_name,
     rclone_base_directory,
+    drive_base,
     youtube_api_key
 );
