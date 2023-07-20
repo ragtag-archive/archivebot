@@ -24,6 +24,7 @@ macro_rules! envcfg {
 
 envcfg!(
     archive_base_url,
+    archive_api_authorization,
     tasq_url,
     rclone_config_data,
     rclone_remote_name,

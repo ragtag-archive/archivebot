@@ -35,11 +35,24 @@ pub async fn run() -> anyhow::Result<()> {
         warn!("No archive base URL specified, using mock archive site");
         Box::new(util::archive::MockRagtag::new().await?)
     } else {
+        let client = reqwest::Client::builder()
+            .default_headers({
+                let mut headers = reqwest::header::HeaderMap::new();
+                headers.insert(
+                    reqwest::header::AUTHORIZATION,
+                    reqwest::header::HeaderValue::from_str(&cfg.archive_api_authorization)
+                        .context("Could not parse archive API authorization header")?,
+                );
+                headers
+            })
+            .build()
+            .context("Could not create HTTP client")?;
+
         Box::new(
             util::archive::Ragtag::new(
                 url::Url::parse(&cfg.archive_base_url)
                     .context("Could not parse archive base URL")?,
-                None,
+                Some(client),
             )
             .await?,
         )

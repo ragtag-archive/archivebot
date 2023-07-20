@@ -1,4 +1,5 @@
 export ARCHIVE_BASE_URL=https://archive.ragtag.moe
+export ARCHIVE_API_AUTHORIZATION='Bearer ...'
 export TASQ_URL=
 export DRIVE_BASE=
 export RCLONE_CONFIG_DATA='
