@@ -17,6 +17,9 @@ jobs:
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
