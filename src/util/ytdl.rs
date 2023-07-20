@@ -6,10 +6,6 @@ use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-static YTDLP_RELEASE_URL: &str = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-static FFMPEG_RELEASE_URL: &str =
-    "https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/linux-x64";
-
 pub struct YTDL {
     ytdlp_path: PathBuf,
     ffmpeg_path: PathBuf,
@@ -187,9 +183,21 @@ impl SelfInstallable for YTDL {
     async fn install(&self) -> anyhow::Result<()> {
         info!("Installing yt-dlp and ffmpeg");
 
+        let (ytdlp_release_url, ffmpeg_release_url) = match crate::built_info::CFG_TARGET_ARCH {
+            "x86_64" => (
+                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
+                "https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/linux-x64",
+            ),
+            "aarch64" => (
+                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64",
+                "https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/linux-arm64",
+            ),
+            _ => anyhow::bail!("Unsupported architecture"),
+        };
+
         let (ytdlp, ffmpeg) = tokio::join!(
-            Self::install_binary(YTDLP_RELEASE_URL, &self.ytdlp_path),
-            Self::install_binary(FFMPEG_RELEASE_URL, &self.ffmpeg_path),
+            Self::install_binary(ytdlp_release_url, &self.ytdlp_path),
+            Self::install_binary(ffmpeg_release_url, &self.ffmpeg_path),
         );
 
         ytdlp.context("Could not install yt-dlp")?;

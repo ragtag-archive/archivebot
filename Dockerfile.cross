@@ -1,0 +1,3 @@
+ARG ARCH_PREFIX=
+FROM ${ARCH_PREFIX}alpine:latest
+COPY archivebot /usr/local/bin/archivebot

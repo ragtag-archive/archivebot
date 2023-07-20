@@ -77,11 +77,17 @@ impl SelfInstallable for Rclone {
             .await
             .context("Could not get latest release info from GitHub")?;
 
+        let asset_name = match crate::built_info::CFG_TARGET_ARCH {
+            "x86_64" => "linux-amd64.zip",
+            "aarch64" => "linux-arm64.zip",
+            _ => anyhow::bail!("Unsupported architecture"),
+        };
+
         // Get the download URL
         let download_url = release
             .assets
             .into_iter()
-            .find(|asset| asset.name.ends_with("linux-amd64.zip"))
+            .find(|asset| asset.name.ends_with(asset_name))
             .take()
             .ok_or_else(|| anyhow::anyhow!("Could not find download URL"))?
             .browser_download_url;
