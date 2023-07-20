@@ -40,6 +40,7 @@ done
 
 # Create manifest
 echo "[*] Creating manifest"
+export DOCKER_CLI_EXPERIMENTAL=enabled
 docker manifest create $image_name:$git_hash \
     $image_name:aarch64 $image_name:amd64
 docker manifest create $image_name:latest \
