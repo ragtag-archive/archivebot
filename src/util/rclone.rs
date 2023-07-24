@@ -158,7 +158,7 @@ impl SelfInstallable for Rclone {
 #[async_trait]
 impl Uploader for Rclone {
     async fn upload(&self, source_dir: &Path, target_dir: &str) -> anyhow::Result<()> {
-        let output = Command::new("rclone")
+        let output = Command::new(&self.rclone_path)
             .arg("--config")
             .arg(&self.config_filepath)
             .arg("copy")
