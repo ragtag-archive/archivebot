@@ -19,3 +19,5 @@ RUN set -ex; \
 
 FROM debian:bookworm-slim
 COPY --from=builder /usr/src/app/target/release/archivebot /usr/local/bin/archivebot
+
+CMD /usr/local/bin/archivebot
