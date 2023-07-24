@@ -18,6 +18,13 @@ RUN set -ex; \
     cargo build --release;
 
 FROM debian:bookworm-slim
+
+RUN set -ex; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates; \
+    rm -rf /var/lib/apt/lists/*; \
+    update-ca-certificates;
+
 COPY --from=builder /usr/src/app/target/release/archivebot /usr/local/bin/archivebot
 
 CMD /usr/local/bin/archivebot
