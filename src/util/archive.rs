@@ -51,7 +51,8 @@ impl ArchiveSite for Ragtag {
     }
 
     async fn archive(&self, id: &str, metadata: &Metadata) -> anyhow::Result<()> {
-        self.client
+        let res = self
+            .client
             .put(
                 self.url
                     .join(&format!("api/v2/archive/{}", id))
@@ -60,10 +61,17 @@ impl ArchiveSite for Ragtag {
             .body(serde_json::to_string(metadata).context("Could not serialize metadata")?)
             .send()
             .await
-            .context("Could not send archive request")?
-            .error_for_status()
-            .context("Got unexpected status code")
-            .map(|_| ())
+            .context("Could not send archive request")?;
+
+        let status = res.status();
+        let text = res.text().await.context("Could not read response body")?;
+        debug!("Response body: {}", text);
+
+        if !status.is_success() {
+            return Err(anyhow::anyhow!("Got unexpected status code: {}", status));
+        }
+
+        Ok(())
     }
 }
 
