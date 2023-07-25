@@ -23,7 +23,7 @@ ENV PATH="/root/.cache/archivebot:$PATH"
 
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates; \
+    apt-get install -y --no-install-recommends ca-certificates libexpat1; \
     rm -rf /var/lib/apt/lists/*; \
     update-ca-certificates;
 
