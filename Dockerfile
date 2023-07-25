@@ -19,6 +19,8 @@ RUN set -ex; \
 
 FROM debian:bookworm-slim
 
+ENV PATH="/root/.cache/archivebot:$PATH"
+
 RUN set -ex; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates; \

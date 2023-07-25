@@ -76,8 +76,8 @@ impl ArchiveBot {
                     sleep(backoff_delay).await;
                     backoff_delay *= 2;
 
-                    if backoff_delay > Duration::from_secs(60 * 60) {
-                        backoff_delay = Duration::from_secs(60 * 60);
+                    if backoff_delay > Duration::from_secs(5 * 60) {
+                        backoff_delay = Duration::from_secs(5 * 60);
                     }
                 }
             }
