@@ -51,6 +51,10 @@ impl ArchiveSite for Ragtag {
     }
 
     async fn archive(&self, id: &str, metadata: &Metadata) -> anyhow::Result<()> {
+        let request_body =
+            serde_json::to_string(metadata).context("Could not serialize metadata")?;
+        debug!("Request body: {}", request_body);
+
         let res = self
             .client
             .put(
@@ -58,7 +62,7 @@ impl ArchiveSite for Ragtag {
                     .join(&format!("api/v2/archive/{}", id))
                     .context("Could not construct archive URL")?,
             )
-            .body(serde_json::to_string(metadata).context("Could not serialize metadata")?)
+            .body(request_body)
             .send()
             .await
             .context("Could not send archive request")?;
