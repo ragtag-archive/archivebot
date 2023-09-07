@@ -59,8 +59,9 @@ impl ArchiveBot {
         }
     }
 
-    pub async fn run_forever(&self) -> ! {
+    pub async fn run_forever(&self, exit_after: chrono::Duration) -> () {
         let mut backoff_delay = Duration::from_secs(30);
+        let next_exit = chrono::Utc::now() + exit_after;
 
         loop {
             info!("Getting next task now");
@@ -80,6 +81,12 @@ impl ArchiveBot {
                         backoff_delay = Duration::from_secs(5 * 60);
                     }
                 }
+            }
+
+            // Check if we need to restart
+            if chrono::Utc::now() > next_exit {
+                info!("Exit time has passed, exiting");
+                return;
             }
         }
     }

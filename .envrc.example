@@ -14,3 +14,4 @@ acl = public-read
 export RCLONE_REMOTE_NAME=localstack
 export RCLONE_BASE_DIRECTORY=test
 export YOUTUBE_API_KEY=
+export RESTART_INTERVAL_SECONDS=3600

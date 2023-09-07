@@ -30,5 +30,6 @@ envcfg!(
     rclone_remote_name,
     rclone_base_directory,
     drive_base,
-    youtube_api_key
+    youtube_api_key,
+    restart_interval_seconds
 );

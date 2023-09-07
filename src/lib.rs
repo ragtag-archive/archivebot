@@ -80,10 +80,16 @@ pub async fn run() -> anyhow::Result<()> {
     let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag, Some(tx));
     let metrics_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3383));
 
+    let exit_after = chrono::Duration::seconds(
+        cfg.restart_interval_seconds
+            .parse()
+            .context("Could not parse restart interval seconds")?,
+    );
+
     info!("{} running", built_info::PKG_NAME);
     tokio::select! {
-        _ = bot.run_forever()
-            => unreachable!(),
+        _ = bot.run_forever(exit_after)
+            => info!("Loop exited!"),
         _ = util::metrics::serve_metrics_endpoint(metrics_addr, rx)
             => unreachable!(),
         _ = tokio::signal::ctrl_c()
