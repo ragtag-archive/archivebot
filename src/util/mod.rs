@@ -149,3 +149,10 @@ pub trait ArchiveSite {
 pub trait MetadataExtractor {
     async fn extract(&self, workdir: &Path) -> anyhow::Result<Metadata>;
 }
+
+pub fn format_path(path: &str) -> String {
+    let now = chrono::Utc::now();
+    path.replace("{year}", &now.format("%Y").to_string())
+        .replace("{month}", &now.format("%m").to_string())
+        .replace("{day}", &now.format("%d").to_string())
+}

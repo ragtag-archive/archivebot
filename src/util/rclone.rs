@@ -1,6 +1,5 @@
-use crate::util::github;
-
 use super::{SelfInstallable, Uploader};
+use crate::util::{format_path, github};
 use anyhow::Context;
 use async_trait::async_trait;
 use std::os::unix::fs::PermissionsExt;
@@ -166,7 +165,7 @@ impl Uploader for Rclone {
             .arg(format!(
                 "{}:{}/{}",
                 self.remote_name,
-                self.base_directory.trim_matches('/'),
+                format_path(self.base_directory.trim_matches('/')),
                 target_dir.trim_matches('/')
             ))
             .output()

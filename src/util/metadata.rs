@@ -1,4 +1,4 @@
-use super::{Metadata, MetadataExtractor};
+use super::{format_path, Metadata, MetadataExtractor};
 use anyhow::Context;
 use async_trait::async_trait;
 use reqwest::Client;
@@ -170,7 +170,7 @@ impl MetadataExtractor for YTMetadataExtractor {
             like_count: info_json.like_count,
             dislike_count: info_json.dislike_count.unwrap_or(-1),
             files,
-            drive_base: self.drive_base.clone(),
+            drive_base: format_path(&self.drive_base),
             archived_timestamp: chrono::Utc::now().to_rfc3339(),
             timestamps: Some(timestamps),
         })
