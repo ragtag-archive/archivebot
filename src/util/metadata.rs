@@ -18,7 +18,7 @@ struct InfoJson {
     fps: i32,
     format_id: String,
     view_count: u64,
-    like_count: Option<u64>,
+    like_count: Option<i64>,
     dislike_count: Option<i64>,
 }
 
