@@ -18,7 +18,7 @@ struct InfoJson {
     fps: i32,
     format_id: String,
     view_count: u64,
-    like_count: u64,
+    like_count: Option<i64>,
     dislike_count: Option<i64>,
 }
 
@@ -167,7 +167,7 @@ impl MetadataExtractor for YTMetadataExtractor {
             fps: info_json.fps,
             format_id: info_json.format_id,
             view_count: info_json.view_count,
-            like_count: info_json.like_count,
+            like_count: info_json.like_count.unwrap_or(-1),
             dislike_count: info_json.dislike_count.unwrap_or(-1),
             files,
             drive_base: format_path(&self.drive_base),

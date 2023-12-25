@@ -113,7 +113,7 @@ pub struct Metadata {
     pub fps: i32,
     pub format_id: String,
     pub view_count: u64,
-    pub like_count: u64,
+    pub like_count: i64,
     pub dislike_count: i64,
     pub files: Vec<MetadataFileEntry>,
     pub drive_base: String,
