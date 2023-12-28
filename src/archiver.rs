@@ -104,7 +104,16 @@ impl ArchiveBot {
 
         info!("Got task: {:?}", task);
         let video_id = task.data;
-        self.run_video(&video_id).await
+        match self.run_video(&video_id).await {
+            Err(e) => {
+                info!("Requeuing {}", video_id);
+                let _ = self.task_queue.insert(video_id).await;
+                return Err(e);
+            }
+            x => {
+                return x;
+            }
+        }
     }
 
     pub async fn run_video(&self, video_id: &str) -> anyhow::Result<()> {
