@@ -78,6 +78,8 @@ impl YTDL {
                 "srv3/best",
                 "--sub-langs",
                 "all,-live_chat",
+                "--match-filter",
+                "!is_live & !is_upcoming",
                 // Metadata
                 "--write-thumbnail",
                 "--write-comments",
@@ -111,6 +113,8 @@ impl YTDL {
             .args(&[
                 "--skip-download",
                 "--write-subs",
+                "--match-filter",
+                "!is_live & !is_upcoming",
                 "--sub-langs",
                 "live_chat",
                 "--sub-format",
