@@ -77,7 +77,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     // Channel for events
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag, Some(tx));
+    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag, Some(tx), cfg.skip_requeue);
     let metrics_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3383));
 
     let exit_after = chrono::Duration::seconds(

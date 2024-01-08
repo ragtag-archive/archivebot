@@ -32,6 +32,7 @@ pub struct ArchiveBot {
     uploader: Box<dyn util::Uploader>,
     archive_site: Box<dyn util::ArchiveSite>,
     events: Option<tokio::sync::mpsc::UnboundedSender<ArchiverState>>,
+    skip_requeue: String,
 }
 
 impl ArchiveBot {
@@ -42,6 +43,7 @@ impl ArchiveBot {
         uploader: Box<dyn util::Uploader>,
         archive_site: Box<dyn util::ArchiveSite>,
         events: Option<tokio::sync::mpsc::UnboundedSender<ArchiverState>>,
+        skip_requeue: String,
     ) -> Self {
         Self {
             task_queue,
@@ -50,6 +52,7 @@ impl ArchiveBot {
             uploader,
             archive_site,
             events,
+            skip_requeue,
         }
     }
 
@@ -104,7 +107,18 @@ impl ArchiveBot {
 
         info!("Got task: {:?}", task);
         let video_id = task.data;
-        self.run_video(&video_id).await
+        match self.run_video(&video_id).await {
+            Err(e) => {
+                if !self.skip_requeue.is_empty() {
+                    info!("Requeuing {}", video_id);
+                    let _ = self.task_queue.insert(video_id).await;
+                }
+                return Err(e);
+            }
+            x => {
+                return x;
+            }
+        }
     }
 
     pub async fn run_video(&self, video_id: &str) -> anyhow::Result<()> {

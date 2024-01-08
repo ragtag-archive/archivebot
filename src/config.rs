@@ -31,5 +31,6 @@ envcfg!(
     rclone_base_directory,
     drive_base,
     youtube_api_key,
-    restart_interval_seconds
+    restart_interval_seconds,
+    skip_requeue
 );
