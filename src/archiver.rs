@@ -298,6 +298,7 @@ mod test {
             Box::new(MockRclone),
             Box::new(MockArchiveSite),
             Some(tx),
+            "".into(),
         );
         bot.run_one().await.unwrap();
 

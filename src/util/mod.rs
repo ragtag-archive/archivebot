@@ -19,6 +19,14 @@ pub async fn get_cache_dir() -> anyhow::Result<PathBuf> {
     Ok(cache_dir)
 }
 
+pub async fn get_ytdl_plugins_dir() -> anyhow::Result<PathBuf> {
+    let dir = dirs::config_dir()
+        .unwrap_or(PathBuf::from("/etc"))
+        .join("yt-dlp/plugins");
+    tokio::fs::create_dir_all(&dir).await?;
+    Ok(dir)
+}
+
 pub fn dir_size(path: &Path) -> anyhow::Result<u64> {
     let mut size = 0;
 

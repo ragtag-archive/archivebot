@@ -9,24 +9,35 @@ use tokio::process::Command;
 pub struct YTDL {
     ytdlp_path: PathBuf,
     ffmpeg_path: PathBuf,
+    pot_plugin_path: PathBuf,
+    pot_server_url: String,
 }
 
 impl YTDL {
     /// Create a new instance of yt-dlp. If the executable is not found, it will
     /// be downloaded.
-    pub async fn new() -> anyhow::Result<Self> {
+    pub async fn new(pot_server_url: String) -> anyhow::Result<Self> {
         let cache_dir = super::get_cache_dir().await?;
+        let plugins_dir = super::get_ytdl_plugins_dir().await?;
         let ytdlp_path = cache_dir.join("yt-dlp");
         let ffmpeg_path = cache_dir.join("ffmpeg");
+        let pot_plugin_path = plugins_dir.join("yt-dlp-get-pot.zip");
 
         // Ensure the cache directory exists
         tokio::fs::create_dir_all(&cache_dir)
             .await
             .context("Could not create cache directory")?;
 
+        // Ensure the plugins directory exists
+        tokio::fs::create_dir_all(&plugins_dir)
+            .await
+            .context("Could not create plugins directory")?;
+
         let ytdl = Self {
             ytdlp_path,
             ffmpeg_path,
+            pot_plugin_path,
+            pot_server_url,
         };
 
         // Install if not already installed
@@ -72,6 +83,9 @@ impl YTDL {
                 "bestvideo+bestaudio",
                 "--ffmpeg-location",
                 &self.ffmpeg_path.to_string_lossy(),
+                // PO Token
+                "--extractor-args",
+                &format!("youtube:getpot_bgutil_baseurl={}", self.pot_server_url),
                 // Subtitles
                 "--write-subs",
                 "--sub-format",
@@ -111,6 +125,9 @@ impl YTDL {
             .kill_on_drop(true)
             .current_dir(workdir)
             .args(&[
+                // PO Token
+                "--extractor-args",
+                &format!("youtube:getpot_bgutil_baseurl={}", self.pot_server_url),
                 "--skip-download",
                 "--write-subs",
                 "--match-filter",
@@ -181,6 +198,7 @@ impl SelfInstallable for YTDL {
                 .output()
                 .await
                 .is_ok()
+            && Path::exists(&self.pot_plugin_path)
     }
 
     /// Install the latest version of yt-dlp from GitHub.
@@ -199,13 +217,17 @@ impl SelfInstallable for YTDL {
             _ => anyhow::bail!("Unsupported architecture"),
         };
 
-        let (ytdlp, ffmpeg) = tokio::join!(
+        let pot_plugin_url = "https://github.com/coletdjnz/yt-dlp-get-pot/releases/download/v0.3.0/yt-dlp-get-pot.zip";
+
+        let (ytdlp, ffmpeg, pot_plugin) = tokio::join!(
             Self::install_binary(ytdlp_release_url, &self.ytdlp_path),
             Self::install_binary(ffmpeg_release_url, &self.ffmpeg_path),
+            Self::install_binary(pot_plugin_url, &self.pot_plugin_path),
         );
 
         ytdlp.context("Could not install yt-dlp")?;
         ffmpeg.context("Could not install ffmpeg")?;
+        pot_plugin.context("Could not install yt-dlp-get-pot")?;
 
         Ok(())
     }
@@ -218,7 +240,9 @@ mod test {
     #[tokio::test]
     #[ignore] // Takes >150s to run
     async fn test_download() {
-        let ytdl = YTDL::new().await.expect("Could not create yt-dlp instance");
+        let ytdl = YTDL::new("https://pot.archive.ragtag.moe".to_string())
+            .await
+            .expect("Could not create yt-dlp instance");
         assert!(ytdl.is_installed().await);
 
         let workdir = super::super::tempdir()

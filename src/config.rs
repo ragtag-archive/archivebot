@@ -32,5 +32,6 @@ envcfg!(
     drive_base,
     youtube_api_key,
     restart_interval_seconds,
-    skip_requeue
+    skip_requeue,
+    pot_server_url
 );

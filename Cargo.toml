@@ -1,6 +1,6 @@
 [package]
 name = "archivebot"
-version = "0.1.0"
+version = "0.1.1"
 repository = "https://github.com/ragtag-archive/archivebot"
 edition = "2021"
 
@@ -49,11 +49,7 @@ hyper = { version = "0.14", features = ["server", "http1", "tcp"] }
 mockito = "0.31.0"
 
 [build-dependencies]
-built = { version = "0.6.1", features = [
-  "git2",
-  "chrono",
-  "semver",
-] }
+built = { version = "0.6.1", features = ["git2", "chrono", "semver"] }
 
 [profile.release]
 lto = true

@@ -61,7 +61,7 @@ pub async fn run() -> anyhow::Result<()> {
     // Instantiate modules
     let (tasq, ytdlp, meta, rclone) = tokio::join!(
         util::tasq::Tasq::new(cfg.tasq_url, None),
-        util::ytdl::YTDL::new(),
+        util::ytdl::YTDL::new(cfg.pot_server_url),
         util::metadata::YTMetadataExtractor::new(cfg.youtube_api_key, None, cfg.drive_base),
         util::rclone::Rclone::new(
             cfg.rclone_config_data,
@@ -77,7 +77,15 @@ pub async fn run() -> anyhow::Result<()> {
 
     // Channel for events
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let bot = archiver::ArchiveBot::new(tasq, ytdlp, meta, rclone, ragtag, Some(tx), cfg.skip_requeue);
+    let bot = archiver::ArchiveBot::new(
+        tasq,
+        ytdlp,
+        meta,
+        rclone,
+        ragtag,
+        Some(tx),
+        cfg.skip_requeue,
+    );
     let metrics_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3383));
 
     let exit_after = chrono::Duration::seconds(
