@@ -118,7 +118,7 @@ pub struct Metadata {
     pub duration: u64,
     pub width: i32,
     pub height: i32,
-    pub fps: i32,
+    pub fps: f32,
     pub format_id: String,
     pub view_count: u64,
     pub like_count: i64,

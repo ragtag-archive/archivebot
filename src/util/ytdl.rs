@@ -128,6 +128,8 @@ impl YTDL {
                 // PO Token
                 "--extractor-args",
                 &format!("youtube:getpot_bgutil_baseurl={}", self.pot_server_url),
+                "--ffmpeg-location",
+                &self.ffmpeg_path.to_string_lossy(),
                 "--skip-download",
                 "--write-subs",
                 "--match-filter",

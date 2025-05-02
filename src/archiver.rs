@@ -251,7 +251,7 @@ mod test {
                 duration: 212,
                 width: 1280,
                 height: 720,
-                fps: 30,
+                fps: 30.0,
                 format_id: "22".into(),
                 view_count: 2250000000,
                 like_count: 999999,
