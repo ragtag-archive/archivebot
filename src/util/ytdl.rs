@@ -127,7 +127,7 @@ impl YTDL {
             .args(&[
                 // PO Token
                 "--extractor-args",
-                &format!("youtube:getpot_bgutil_baseurl={}", self.pot_server_url),
+                &format!("youtubepot-bgutilhttp:base_url=={}", self.pot_server_url),
                 "--ffmpeg-location",
                 &self.ffmpeg_path.to_string_lossy(),
                 "--skip-download",
@@ -219,7 +219,7 @@ impl SelfInstallable for YTDL {
             _ => anyhow::bail!("Unsupported architecture"),
         };
 
-        let pot_plugin_url = "https://github.com/coletdjnz/yt-dlp-get-pot/releases/download/v0.3.0/yt-dlp-get-pot.zip";
+        let pot_plugin_url = "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/1.2.2/bgutil-ytdlp-pot-provider.zip";
 
         let (ytdlp, ffmpeg, pot_plugin) = tokio::join!(
             Self::install_binary(ytdlp_release_url, &self.ytdlp_path),
