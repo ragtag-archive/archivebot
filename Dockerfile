@@ -28,5 +28,6 @@ RUN set -ex; \
     update-ca-certificates;
 
 COPY --from=builder /usr/src/app/target/release/archivebot /usr/local/bin/archivebot
+COPY --from=denoland/deno:bin-2.6.3 /deno /usr/local/bin/deno
 
 CMD /usr/local/bin/archivebot

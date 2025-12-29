@@ -11,7 +11,6 @@ pub struct YTDL {
     ffmpeg_path: PathBuf,
     pot_plugin_path: PathBuf,
     pot_server_url: String,
-    deno_path: PathBuf,
 }
 
 impl YTDL {
@@ -23,7 +22,6 @@ impl YTDL {
         let ytdlp_path = cache_dir.join("yt-dlp");
         let ffmpeg_path = cache_dir.join("ffmpeg");
         let pot_plugin_path = plugins_dir.join("yt-dlp-get-pot.zip");
-        let deno_path = cache_dir.join("deno");
 		
 
         // Ensure the cache directory exists
@@ -41,7 +39,6 @@ impl YTDL {
             ffmpeg_path,
             pot_plugin_path,
             pot_server_url,
-            deno_path,
         };
 
         // Install if not already installed
@@ -211,33 +208,29 @@ impl SelfInstallable for YTDL {
     async fn install(&self) -> anyhow::Result<()> {
         info!("Installing yt-dlp and ffmpeg");
 
-        let (ytdlp_release_url, ffmpeg_release_url, deno_release_url) = match crate::built_info::CFG_TARGET_ARCH {
+        let (ytdlp_release_url, ffmpeg_release_url) = match crate::built_info::CFG_TARGET_ARCH {
             "x86_64" => (
                 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
                 "https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/linux-x64",
-                "https://github.com/denoland/deno/releases/download/v2.6.3/deno-x86_64-unknown-linux-gnu.zip",
             ),
             "aarch64" => (
                 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64",
                 "https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/linux-arm64",
-                "https://github.com/denoland/deno/releases/download/v2.6.3/deno-aarch64-unknown-linux-gnu.zip",
             ),
             _ => anyhow::bail!("Unsupported architecture"),
         };
 
         let pot_plugin_url = "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/1.2.2/bgutil-ytdlp-pot-provider.zip";
 
-        let (ytdlp, ffmpeg, pot_plugin, deno) = tokio::join!(
+        let (ytdlp, ffmpeg, pot_plugin) = tokio::join!(
             Self::install_binary(ytdlp_release_url, &self.ytdlp_path),
             Self::install_binary(ffmpeg_release_url, &self.ffmpeg_path),
             Self::install_binary(pot_plugin_url, &self.pot_plugin_path),
-            Self::install_binary(deno_release_url, &self.deno_path),
         );
 
         ytdlp.context("Could not install yt-dlp")?;
         ffmpeg.context("Could not install ffmpeg")?;
         pot_plugin.context("Could not install yt-dlp-get-pot")?;
-        deno.context("Could not install deno runtime")?;
 
         Ok(())
     }
